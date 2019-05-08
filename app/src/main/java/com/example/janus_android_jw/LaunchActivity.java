@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
@@ -35,19 +36,28 @@ import talk_cloud.TalkCloudModel;
 public class LaunchActivity extends AppCompatActivity implements TextToSpeech.OnInitListener {
 
     private TextToSpeech textToSpeech;
+    private TextView textView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.launch);
-        textToSpeech = new TextToSpeech(this, this);
+        textToSpeech = new TextToSpeech(LaunchActivity.this, this);
+
+        textView = (TextView)findViewById(R.id.text);
+        textView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+            }
+        });
 
         if (AppTools.isNetworkConnected(LaunchActivity.this)) {
             GrpcConnectionManager.initGrpcConnectionManager();
             //todo
             autoLogin();
         } else {
-            myToast(R.string.network_unavailable,null);
+            myToast(R.string.network_unavailable,"");
         }
 
     }
@@ -96,7 +106,7 @@ public class LaunchActivity extends AppCompatActivity implements TextToSpeech.On
         }
 
         if(loginRsp == null){
-            myToast(R.string.request_data_null,null);
+            myToast(R.string.request_data_null,"");
             return;
         }
 
@@ -105,7 +115,7 @@ public class LaunchActivity extends AppCompatActivity implements TextToSpeech.On
             return;
         }
 
-        myToast(R.string.login_success,null);
+        myToast(R.string.login_success,"");
 
         UserBean userBean = new UserBean();
         userBean.setUserId(loginRsp.getUserInfo().getId());
@@ -125,7 +135,7 @@ public class LaunchActivity extends AppCompatActivity implements TextToSpeech.On
             @Override
             public void run() {
                 try{
-                    sleep(1000);
+                    sleep(1200);
                     Message message = new Message();
                     message.what = 0;
                     handler.sendMessage(message);
@@ -143,6 +153,11 @@ public class LaunchActivity extends AppCompatActivity implements TextToSpeech.On
             switch (msg.what) {
                 case 0:
                     startActivity(new Intent(LaunchActivity.this,MainActivity.class));
+                    if(textToSpeech != null){
+                        textToSpeech.stop();
+                        textToSpeech.shutdown();
+                        textToSpeech = null;
+                    }
                     LaunchActivity.this.finish();
                     break;
             }
@@ -155,9 +170,9 @@ public class LaunchActivity extends AppCompatActivity implements TextToSpeech.On
             @Override
             public void run() {
                 try{
-                    sleep(100);
+                    sleep(200);
                     String text;
-                    if(msg == null){
+                    if("".equals(msg)){
                         text = getResources().getString(id);
                     }else{
                         text = msg;
@@ -169,5 +184,15 @@ public class LaunchActivity extends AppCompatActivity implements TextToSpeech.On
             }
         };
         myThread.start();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if(textToSpeech != null){
+            textToSpeech.stop();
+            textToSpeech.shutdown();
+            textToSpeech = null;
+        }
     }
 }

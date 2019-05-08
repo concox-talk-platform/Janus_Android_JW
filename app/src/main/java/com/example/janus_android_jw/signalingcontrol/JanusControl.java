@@ -510,6 +510,42 @@ public class JanusControl {
     }
 
     //发送配置信令，muted，切换静音
+    public static void sendLeave(final MyControlCallBack myControlCallBack,int leaveRoomId){
+        try {
+            controlCallBack = myControlCallBack;
+            final JSONObject msg = new JSONObject();
+            JSONObject body = new JSONObject();
+            body.put(REQUEST, "leave");
+            body.put("room", leaveRoomId);
+            body.put("display", userName);
+            msg.put(MESSAGE, body);
+            handle.sendMessage(new IPluginHandleSendMessageCallbacks() {
+                @Override
+                public void onSuccessSynchronous(JSONObject obj) {
+                    myControlCallBack.showMessage(obj,null);
+                }
+
+                @Override
+                public void onSuccesAsynchronous() {
+
+                }
+
+                @Override
+                public JSONObject getMessage() {
+                    return msg;
+                }
+
+                @Override
+                public void onCallbackError(String error) {
+
+                }
+            });
+        }catch (Exception ex) {
+
+        }
+    }
+
+    //发送配置信令，muted，切换静音
     public static void sendConfigure(final MyControlCallBack myControlCallBack,boolean muted){
         try {
             controlCallBack = myControlCallBack;

@@ -1,12 +1,12 @@
 package com.example.janus_android_jw;
 
-import android.Manifest;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.media.MediaPlayer;
-import android.os.BatteryManager;
+import android.net.Uri;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.speech.tts.TextToSpeech;
@@ -29,9 +29,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.webrtc.MediaStream;
 
-import java.io.File;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -41,6 +39,7 @@ import io.grpc.ManagedChannel;
 import io.grpc.stub.StreamObserver;
 import talk_cloud.TalkCloudApp;
 import talk_cloud.TalkCloudGrpc;
+import webrtc.AppRTCAudioManager;
 
 public class MainActivity extends AppCompatActivity implements TextToSpeech.OnInitListener,MyControlCallBack {
 
@@ -48,8 +47,9 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
     private TextToSpeech textToSpeech;
     private JanusControl janusControl;
     private int position = 0;
-    private MediaPlayer mMediaPlayer;
-    private int palyBackPosition = 0;
+    private int playBackPosition = 0;
+    private AppRTCAudioManager audioManager = null;
+    private MediaPlayer mediaPlayer;
 
     private Thread instantMessageThread;
 
@@ -71,6 +71,15 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
             }
         }
 
+        audioManager = AppRTCAudioManager.create(MainActivity.this, new Runnable() {
+                    @Override
+                    public void run() {
+
+                    }
+                }
+        );
+        audioManager.init();
+
         //开启即时消息线程
         getInstantMessage();
 
@@ -88,6 +97,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
             @Override
             public void onClick(View v) {
                 sendBroadcast( new Intent("android.intent.action.ext_p1.down"));
+                myMediaPlayer("",R.raw.start);
             }
         });
 
@@ -183,18 +193,26 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
     public void showMessage(JSONObject msg, JSONObject jsepLocal) {
         try {
             if (msg.getString("pocroom").equals("audiobridgeisok")) {
+                Log.e("-pocroom------",msg.getString("pocroom"));
                 JanusControl.janusControlCreatePeerConnectionFactory(MainActivity.this);
                 JanusControl.sendPocRoomJoinRoom(MainActivity.this,UserBean.getUserBean().getDefaultGroupId());
             }else if(msg.getString("pocroom").equals("joined")){
+                Log.e("-pocroom------",msg.getString("pocroom"));
                 if(msg.has("id") && msg.getInt("id") == UserBean.getUserBean().getUserId() ){
                     JanusControl.sendPocRoomCreateOffer(MainActivity.this);
                 }
             }else if(msg.getString("pocroom").equals("event")){
-                if(msg.has("error_code")){
+                Log.e("-pocroom------",msg.getString("pocroom"));
+                if(msg.has("error_code") && msg.getInt("error_code") ==490){
+                    Message message208 = new Message();
+                    message208.what = 208;
+                    handler.sendMessage(message208);
+                }else if(msg.has("error_code")){
                     Message message203 = new Message();
                     message203.what = 203;
                     handler.sendMessage(message203);
                 }
+
                 if (msg.has("talkfreed")){
                     if(msg.getInt("talkfreed") != UserBean.getUserBean().getUserId()){
                         Message message207 = new Message();
@@ -202,26 +220,29 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                         handler.sendMessage(message207);
                     }
                 }
-
             }else if(msg.getString("pocroom").equals("webRtcisok")){
+                Log.e("-pocroom------",msg.getString("pocroom"));
                 Message message202 = new Message();
                 message202.what = 202;
                 handler.sendMessage(message202);
             }else if (msg.getString("pocroom").equals("roomchanged")) {
+                Log.e("-pocroom------",msg.getString("pocroom"));
                 Message message201 = new Message();
                 message201.what = 201;
                 handler.sendMessage(message201);
             }else if(msg.getString("pocroom").equals("talked")){
-                if(msg.getInt("id") == 0 || (msg.getInt("id") == UserBean.getUserBean().getUserId()) ){
+                Log.e("-pocroom------",msg.getString("pocroom"));
+                if(msg.has("id")){
                     Message message204 = new Message();
                     message204.what = 204;
                     handler.sendMessage(message204);
-                }else{
+                }else if(msg.has("talkholder")){
                     Message message205 = new Message();
                     message205.what = 205;
                     handler.sendMessage(message205);
                 }
             }else if(msg.getString("pocroom").equals("untalked")){
+                Log.e("-pocroom------",msg.getString("pocroom"));
                 Message message206 = new Message();
                 message206.what = 206;
                 handler.sendMessage(message206);
@@ -236,9 +257,27 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        close();
+    }
+
+    private void close(){
+        if (audioManager != null) {
+            audioManager.close();
+            audioManager = null;
+        }
+        if(mediaPlayer != null){
+            mediaPlayer.release();
+            mediaPlayer = null;
+        }
+
         JanusControl.closeJanusServer();
         GrpcConnectionManager.closeGrpcConnectionManager();
         UserBean.clearUserBean();
+        if(textToSpeech != null){
+            textToSpeech.stop();
+            textToSpeech.shutdown();
+            textToSpeech = null;
+        }
     }
 
     @Override
@@ -268,62 +307,77 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
         @Override
         public void onReceive(Context context, Intent intent) {
             if("android.intent.action.ext_ptt.down".equals(intent.getAction())){
+                Log.e("-anniu------",intent.getAction());
                 Message message0 = new Message();
                 message0.what = 0;
                 handler.sendMessage(message0);
             }else if("android.intent.action.ext_ptt.longpress".equals(intent.getAction())){
+                Log.e("-anniu------",intent.getAction());
                 Message message1 = new Message();
                 message1.what = 1;
                 handler.sendMessage(message1);
             }else if("android.intent.action.ext_ptt.up".equals(intent.getAction())){
+                Log.e("-anniu------",intent.getAction());
                 Message message2 = new Message();
                 message2.what = 2;
                 handler.sendMessage(message2);
             }else if("android.intent.action.ext_p1.down".equals(intent.getAction())){
+                Log.e("-anniu------",intent.getAction());
                 Message message3 = new Message();
                 message3.what = 3;
                 handler.sendMessage(message3);
             }else if("android.intent.action.ext_p1.longpress".equals(intent.getAction())){
+                Log.e("-anniu------",intent.getAction());
                 Message message4 = new Message();
                 message4.what = 4;
                 handler.sendMessage(message4);
             }else if("android.intent.action.ext_p1.up".equals(intent.getAction())){
+                Log.e("-anniu------",intent.getAction());
                 Message message5 = new Message();
                 message5.what = 5;
                 handler.sendMessage(message5);
             }else if("android.intent.action.ext_p2.down".equals(intent.getAction())){
+                Log.e("-anniu------",intent.getAction());
                 Message message6 = new Message();
                 message6.what = 6;
                 handler.sendMessage(message6);
             }else if("android.intent.action.ext_p2.longpres".equals(intent.getAction())){
+                Log.e("-anniu------",intent.getAction());
                 Message message7 = new Message();
                 message7.what = 7;
                 handler.sendMessage(message7);
             }else if("android.intent.action.ext_p2.up".equals(intent.getAction())){
+                Log.e("-anniu------",intent.getAction());
                 Message message8 = new Message();
                 message8.what = 8;
                 handler.sendMessage(message8);
             }else if("android.intent.action.ext_p3.down".equals(intent.getAction())){
+                Log.e("-anniu------",intent.getAction());
                 Message message9 = new Message();
                 message9.what = 9;
                 handler.sendMessage(message9);
             }else if("android.intent.action.ext_p3.longpress".equals(intent.getAction())){
+                Log.e("-anniu------",intent.getAction());
                 Message message10 = new Message();
                 message10.what = 10;
                 handler.sendMessage(message10);
             }else if("android.intent.action.ext_p3.up".equals(intent.getAction())){
+                Log.e("-anniu------",intent.getAction());
                 Message message11 = new Message();
                 message11.what = 11;
                 handler.sendMessage(message11);
             }else if("android.intent.action.ext_fun.down".equals(intent.getAction())){
+                Log.e("-anniu------",intent.getAction());
                 Message message12 = new Message();
                 message12.what = 12;
                 handler.sendMessage(message12);
             }else if("android.intent.action.ext_fun.longpress".equals(intent.getAction())){
+                Log.e("-anniu------",intent.getAction());
                 Message message13 = new Message();
                 message13.what = 13;
                 handler.sendMessage(message13);
             }else if("android.intent.action.ext_fun.up".equals(intent.getAction())){
+                Log.e("-anniu------",intent.getAction());
                 Message message14 = new Message();
                 message14.what = 14;
                 handler.sendMessage(message14);
@@ -335,25 +389,32 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
         public void handleMessage(android.os.Message msg) {
             switch (msg.what) {
                 case 0:
+                    //ptt down
                     JanusControl.sendTalk(MainActivity.this);
                     break;
                 case 1:
+                    //ptt lang
 
                     break;
                 case 2:
+                    //ptt up
                     JanusControl.sendConfigure(MainActivity.this,true);
                     JanusControl.sendUnTalk(MainActivity.this);
                     break;
                 case 3:
+                    //p1 down
 
                     break;
                 case 4:
+                    //p1 lang
 
                     break;
                 case 5:
+                    //p1 up
 
                     break;
                 case 6:
+                    //p2 down
                     //change group
                     if(UserBean.getUserBean().getGroupBeanArrayList().size() > 1){
                         if(position == UserBean.getUserBean().getGroupBeanArrayList().size()-1){
@@ -363,31 +424,39 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                         }
                         JanusControl.sendChangeGroup(MainActivity.this,UserBean.getUserBean().getGroupBeanArrayList().get(position).getGroupId() );
                         UserBean.getUserBean().setDefaultGroupId(UserBean.getUserBean().getGroupBeanArrayList().get(position).getGroupId());
-                        palyBackPosition = 0;
+                        playBackPosition = 0;
                     }
                     break;
                 case 7:
+                    //p2 lang
 
                     break;
                 case 8:
+                    //p2 up
 
                     break;
                 case 9:
-
+                    //p3 down
+                    playBack();
                     break;
                 case 10:
+                    //p3 lang
 
                     break;
                 case 11:
+                    //p3 up
 
                     break;
                 case 12:
+                    //p4 down
 
                     break;
                 case 13:
+                    //p4 lang
 
                     break;
                 case 14:
+                    //p4 up
 
                     break;
                 case 100:
@@ -397,7 +466,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                         @Override
                         public void run() {
                             try{
-                                sleep(2000);
+                                sleep(5000);
                                 janusControl.Start();
                             }catch (Exception e){
                                 e.printStackTrace();
@@ -414,36 +483,34 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                     break;
                 case 202:
                     //进入群组成功
-                    myToast(R.string.entry_room_success,null);
+                    myToast(R.string.app_name,"entry into "+UserBean.getUserBean().getGroupBeanArrayList().get(position).getGroupName());
                     break;
                 case 203:
                     //进入群组失败
-                    myToast(R.string.entry_room_failure,null);
+                    //myToast(R.string.entry_room_failure,null);
                     break;
                 case 204:
                     //获取讲话权限
                     JanusControl.sendConfigure(MainActivity.this,false);
                     sendBroadcast( new Intent("com.dfl.redled.on"));
-                    mMediaPlayer = MediaPlayer.create(MainActivity.this, R.raw.start_tx10);
-                    mMediaPlayer.start();
+                    myMediaPlayer("",R.raw.start);
                     break;
                 case 205:
                     //未获取到讲话权限-有人在讲话-指示灯为绿色开启
                     sendBroadcast( new Intent("com.dfl.greenled.on"));
-                    mMediaPlayer = MediaPlayer.create(MainActivity.this, R.raw.start_tx10);
-                    mMediaPlayer.start();
                     break;
                 case 206:
                     //放麦
                     sendBroadcast( new Intent("com.dfl.redled.off"));
-                    mMediaPlayer = MediaPlayer.create(MainActivity.this, R.raw.start_tx10);
-                    mMediaPlayer.start();
                     break;
                 case 207:
                     //讲话结束-指示灯为绿色开启
                     sendBroadcast( new Intent("com.dfl.greenled.off"));
-                    mMediaPlayer = MediaPlayer.create(MainActivity.this, R.raw.start_tx10);
-                    mMediaPlayer.start();
+                    break;
+                case 208:
+                   //pocRoom already exists
+                    //JanusControl.sendLeave(MainActivity.this,UserBean.getUserBean().getDefaultGroupId());
+                    //JanusControl.sendPocRoomJoinRoom(MainActivity.this,UserBean.getUserBean().getDefaultGroupId());
                     break;
                 case 301:
                     //收到当前群组中的SOS信息
@@ -458,7 +525,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
             @Override
             public void run() {
                 try{
-                    sleep(100);
+                    sleep(300);
                     String text;
                     if(msg == null){
                         text = getResources().getString(id);
@@ -511,9 +578,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
             if ((System.currentTimeMillis() - exitTime) > 3000) {
                 exitTime =  System.currentTimeMillis();
             }else{
-                JanusControl.closeJanusServer();
-                GrpcConnectionManager.closeGrpcConnectionManager();
-                UserBean.clearUserBean();
+                close();
                 finish();
             }
             return false;
@@ -535,7 +600,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                             if (type == 3) {//在线消息
                                 if(value.getImMsgData().getReceiverType() == 2){
                                     if(UserBean.getUserBean().getDefaultGroupId() == value.getImMsgData().getReceiverId()){
-                                        palyBackPosition = 0;
+                                        playBackPosition = 0;
                                         if(value.getImMsgData().getResourcePath().indexOf("SOS") != -1){
                                             Message message301 = new Message();
                                             message301.what = 301;
@@ -547,7 +612,10 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                                             MessageBean messageBean = new MessageBean();
                                             messageBean.setType(value.getImMsgData().getMsgType());
                                             messageBean.setMessage(value.getImMsgData().getResourcePath());
-
+                                            if(UserBean.getUserBean().getGroupBeanArrayList().get(i).getMessageBeanArrayList() == null){
+                                                ArrayList<MessageBean> messageBeanArrayList = new ArrayList<>();
+                                                UserBean.getUserBean().getGroupBeanArrayList().get(i).setMessageBeanArrayList(messageBeanArrayList);
+                                            }
                                             UserBean.getUserBean().getGroupBeanArrayList().get(i).getMessageBeanArrayList().add(0,messageBean);
                                             if(UserBean.getUserBean().getGroupBeanArrayList().get(i).getMessageBeanArrayList().size()>=11){
                                                 UserBean.getUserBean().getGroupBeanArrayList().get(i).getMessageBeanArrayList().remove(10);
@@ -609,12 +677,58 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
         instantMessageThread.start();
     }
 
-    private void palyBack(){
+    private  String destFileDir = Environment.getExternalStorageDirectory()+"/media";
 
+    private void playBack(){
+        if(UserBean.getUserBean().getGroupBeanArrayList().get(position).getMessageBeanArrayList()!= null){
+            if(UserBean.getUserBean().getGroupBeanArrayList().get(position).getMessageBeanArrayList().get(playBackPosition).getType() == 3){
+                myMediaPlayer(UserBean.getUserBean().getGroupBeanArrayList().get(position).getMessageBeanArrayList().get(playBackPosition).getMessage(),0);
+                playBackPosition = playBackPosition + 1;
+                if(playBackPosition >= 10 || playBackPosition == UserBean.getUserBean().getGroupBeanArrayList().get(position).getMessageBeanArrayList().size()){
+                    playBackPosition = 0;
+                }
+            }
+        }
+    }
 
-        palyBackPosition = palyBackPosition + 1;
-        if(palyBackPosition >= 10){
-            palyBackPosition = 0;
+    private void myMediaPlayer(String path,int rawId){
+        if(mediaPlayer != null && mediaPlayer.isPlaying()){
+            mediaPlayer.stop();
+            mediaPlayer.release();
+            mediaPlayer = null;
+        }
+        try {
+            mediaPlayer = new MediaPlayer();
+            if(path.equals("")){
+                mediaPlayer.setDataSource(MainActivity.this,Uri.parse("android.resource://" + getPackageName() + "/" + rawId));
+            }else{
+                mediaPlayer.setDataSource(path);
+            }
+            //mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
+            mediaPlayer.prepareAsync();
+            mediaPlayer.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
+                @Override
+                public void onPrepared(MediaPlayer mp) {
+                    mediaPlayer.start();
+                }
+            });
+            mediaPlayer.setOnErrorListener(new MediaPlayer.OnErrorListener() {
+                @Override
+                public boolean onError(MediaPlayer mp, int what, int extra) {
+
+                    return false;
+                }
+            });
+            mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+
+                @Override
+                public void onCompletion(MediaPlayer paramMediaPlayer) {
+                    mediaPlayer.release();
+                    mediaPlayer = null;
+                }
+            });
+        }catch (Exception e){
+
         }
     }
 
