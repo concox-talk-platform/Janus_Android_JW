@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.media.MediaPlayer;
+import android.net.ConnectivityManager;
 import android.net.Uri;
 import android.os.Environment;
 import android.os.Handler;
@@ -24,6 +25,7 @@ import com.example.janus_android_jw.bean.UserBean;
 import com.example.janus_android_jw.signalingcontrol.JanusControl;
 import com.example.janus_android_jw.signalingcontrol.MyControlCallBack;
 import com.example.janus_android_jw.tool.GrpcConnectionManager;
+import com.example.janus_android_jw.tool.NetworkUtil;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -58,6 +60,8 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
     private Button button3 = null;
     private Button button4 = null;
     private Button button5 = null;
+
+    private boolean network = true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -166,6 +170,8 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
         intentFilter.addAction("android.intent.action.ext_fun.down");
         intentFilter.addAction("android.intent.action.ext_fun.longpress");
         intentFilter.addAction("android.intent.action.ext_fun.up");
+
+        intentFilter.addAction("android.net.conn.CONNECTIVITY_CHANGE");
         registerReceiver(myBroadcastReceiver, intentFilter);
     }
 
@@ -204,9 +210,8 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
             }else if(msg.getString("pocroom").equals("event")){
                 Log.e("-pocroom------",msg.getString("pocroom"));
                 if(msg.has("error_code") && msg.getInt("error_code") ==490){
-                    Message message208 = new Message();
-                    message208.what = 208;
-                    handler.sendMessage(message208);
+                    //已经在房间，直接建立webRTC连接
+                    JanusControl.sendPocRoomCreateOffer(MainActivity.this);
                 }else if(msg.has("error_code")){
                     Message message203 = new Message();
                     message203.what = 203;
@@ -381,6 +386,11 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                 Message message14 = new Message();
                 message14.what = 14;
                 handler.sendMessage(message14);
+            }else if("android.net.conn.CONNECTIVITY_CHANGE".equals(intent.getAction())){
+                Log.e("-wangluo------",intent.getAction());
+                Message message15 = new Message();
+                message15.what = 15;
+                handler.sendMessage(message15);
             }
         }
     }
@@ -459,21 +469,41 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                     //p4 up
 
                     break;
+                case 15:
+                    //网络状态
+                    int netWorkStates = NetworkUtil.getNetWorkStates(MainActivity.this);
+                    switch (netWorkStates) {
+                        case NetworkUtil.TYPE_NONE:
+                            //断网了
+                            network = false;
+                            break;
+                        case NetworkUtil.TYPE_MOBILE:
+                            //打开了移动网络和wifi
+                            if(!network){
+                                JanusControl.closeJanusServer();
+                                Thread myThread11=new Thread(){
+                                    @Override
+                                    public void run() {
+                                        try{
+                                            sleep(5000);
+                                            Log.e("--wangluo--",network+"");
+                                            janusControl.Start();
+                                            getInstantMessage();
+                                        }catch (Exception e){
+                                            e.printStackTrace();
+                                        }
+                                    }
+                                };
+                                myThread11.start();
+                            }
+                            break;
+                        default:
+                            break;
+                    }
+                    break;
                 case 100:
                     myToast(R.string.websocket_connection_fail,null);
-                    JanusControl.closeJanusServer();
-                    Thread myThread11=new Thread(){
-                        @Override
-                        public void run() {
-                            try{
-                                sleep(5000);
-                                janusControl.Start();
-                            }catch (Exception e){
-                                e.printStackTrace();
-                            }
-                        }
-                    };
-                    myThread11.start();
+
                     break;
                 case 201:
                     //切换群组
@@ -595,6 +625,8 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                     StreamObserver<TalkCloudApp.StreamResponse> response = new StreamObserver<TalkCloudApp.StreamResponse>() {
                         @Override
                         public void onNext(TalkCloudApp.StreamResponse value) {
+                            network = true;
+                            Log.e("--wangluo--IM--",network+"");
                             //接收服务器下发的消息
                             int type = value.getDataType();
                             if (type == 3) {//在线消息
