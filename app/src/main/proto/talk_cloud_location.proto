@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+package talk_cloud;
+
+import "talk_cloud_model.proto";
+service TalkCloudLocation {
+    // 上报设备数据
+    rpc ReportGPSData (ReportDataReq) returns (ReportDataResp) {
+    };
+
+    //
+
+}
+
+message ReportDataReq {
+    int32 uid = 1;
+    string iMei = 2;
+    int32 dataType = 3;
+    Device deviceInfo = 4;
+    Location locationInfo = 5;
+}
+
+message Device {
+    int32 id = 1; // 设备id号
+    int32 deviceType = 2; // 设备类型，具体类型待定
+    int32 battery = 3; // 设备电量
+}
+
+message Location {
+    GPS gpsInfo = 1;
+    BaseStation bSInfo = 2;
+    Wifi wifiInfo = 3;
+    BlueTooth btInfo = 4;
+}
+
+message GPS {
+    uint64 localTime = 1; // 定位时间 TODO 当地发送数据的即时时间？
+    double longitude = 2; // 经度
+    double latitude = 3; // 纬度
+    float speed = 4; // 速度
+    float course = 5; // 航向   TODO
+}
+
+message BaseStation {
+    int32 country = 1;
+    int32 operator = 2;
+    int32 lac = 3;
+    int32 cid = 4;
+    int32 firstBs = 5; // 第一个基站的强度   TODO 类型
+    int32 secondBs = 6; // 第二个基站的信号强度
+    int32 thirdBs = 7;
+    int32 fourthBs = 8;
+}
+
+// TODO 待定
+message Wifi {
+    int32 firstWifi = 1; // 第一个wifi的强度   TODO ID1_强度？
+    int32 secondWifi = 2; // 第二个wifi的信号强度
+    int32 thirdWifi = 3;
+    int32 fourthWifi = 4;
+}
+
+//TODO 待定
+message BlueTooth {
+    int32 firstBt = 1; // 第一个wifi的强度   TODO ID1_强度？
+    int32 secondBt = 2; // 第二个wifi的信号强度
+    int32 thirdBt = 3;
+    int32 fourthBt = 4;
+}
+
+message ReportDataResp {
+    Result res = 1;
+}

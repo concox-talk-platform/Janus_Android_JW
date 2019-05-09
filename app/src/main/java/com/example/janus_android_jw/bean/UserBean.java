@@ -5,6 +5,7 @@ import java.util.ArrayList;
 public class UserBean {
     private String userName;
     private int userId;
+    private String nickName;
     private int defaultGroupId;
     private ArrayList<GroupBean> groupBeanArrayList;
 
@@ -22,6 +23,14 @@ public class UserBean {
 
     public void setUserId(int userId) {
         this.userId = userId;
+    }
+
+    public String getNickName() {
+        return nickName;
+    }
+
+    public void setNickName(String nickName) {
+        this.nickName = nickName;
     }
 
     public int getDefaultGroupId() {

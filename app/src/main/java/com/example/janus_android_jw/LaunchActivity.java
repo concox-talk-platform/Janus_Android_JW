@@ -98,8 +98,9 @@ public class LaunchActivity extends AppCompatActivity implements TextToSpeech.On
             GrpcConnectionManager.getInstance().getGrpcInstantRequestHandler().submit(new Runnable() {
                 @Override
                 public void run() {
+                    Log.d("MainActivity","MainActivity this is handleLoginTaskBack 1111111");
                     TalkCloudApp.LoginRsp loginRsp = GrpcConnectionManager.getInstance().getBlockingStub().login(loginReq);
-
+                    Log.d("MainActivity","MainActivity this is handleLoginTaskBack 222 result="+loginRsp.getRes().getCode());
                     Message msg = Message.obtain();
                     msg.obj = loginRsp;
                     msg.what = 1;   //标志消息的标志
@@ -127,6 +128,7 @@ public class LaunchActivity extends AppCompatActivity implements TextToSpeech.On
         UserBean userBean = new UserBean();
         userBean.setUserId(loginRsp.getUserInfo().getId());
         userBean.setUserName(loginRsp.getUserInfo().getUserName());
+        userBean.setNickName(loginRsp.getUserInfo().getNickName());
         userBean.setDefaultGroupId((loginRsp.getUserInfo().getLockGroupId() == 0)?207:loginRsp.getUserInfo().getLockGroupId());
         ArrayList<GroupBean> groupBeanArrayList = new ArrayList<>();
         for (TalkCloudApp.GroupInfo groupRecord: loginRsp.getGroupListList()) {

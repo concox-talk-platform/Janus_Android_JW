@@ -26,6 +26,7 @@ import android.widget.Toast;
 
 import com.example.janus_android_jw.bean.MessageBean;
 import com.example.janus_android_jw.bean.UserBean;
+import com.example.janus_android_jw.gps.LocationService;
 import com.example.janus_android_jw.receiver.BatteryReveiver;
 import com.example.janus_android_jw.signalingcontrol.JanusControl;
 import com.example.janus_android_jw.signalingcontrol.MyControlCallBack;
@@ -51,6 +52,8 @@ import webrtc.AppRTCAudioManager;
 
 public class MainActivity extends AppCompatActivity implements TextToSpeech.OnInitListener,MyControlCallBack {
 
+    private static int SEND_SOS_TYPE = 6;
+    private static int CANCEL_SOS_TYPE = 7;
     private  MyBroadcastReceiver myBroadcastReceiver;
     private BatteryReveiver mBatteryReveiver;
     private TextToSpeech textToSpeech;
@@ -67,7 +70,6 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
     private Button button3 = null;
     private Button button4 = null;
     private Button button5 = null;
-    private static boolean isLoopingSOS = false;
 
     private boolean network = true;
 
@@ -150,10 +152,13 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
             @Override
             public void onClick(View v) {
                 //sendBroadcast( new Intent("android.intent.action.ext_fun.down"));
-                isLoopingSOS = false;
-                handler.removeMessages(301);
+                Message message3 = new Message();
+                message3.what = 3;
+                handler.sendMessage(message3);
             }
         });
+        Intent intent = new Intent(this, LocationService.class);
+        startService(intent);
     }
 
     @Override
@@ -188,6 +193,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
         IntentFilter filter2 = new IntentFilter();
         filter2.addAction(Intent.ACTION_BATTERY_CHANGED);
         registerReceiver(mBatteryReveiver, filter2);
+
     }
 
     @Override
@@ -282,6 +288,8 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
     protected void onDestroy() {
         super.onDestroy();
         close();
+        Intent intent = new Intent(this, LocationService.class);
+        stopService(intent);
     }
 
     private void close(){
@@ -348,6 +356,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                 handler.sendMessage(message2);
             }else if("android.intent.action.ext_p1.down".equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
+                cancelSOS();
                 Message message3 = new Message();
                 message3.what = 3;
                 handler.sendMessage(message3);
@@ -432,12 +441,11 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                     JanusControl.sendUnTalk(MainActivity.this);
                     break;
                 case 3:
-                    isLoopingSOS = false;
                     handler.removeMessages(301);
                     break;
                 case 4:
-                    isLoopingSOS = true;
-                    handleSOSTaskBack();
+                    //sendSOS();
+                    handleSOSTaskBack(SEND_SOS_TYPE);
                     break;
                 case 5:
                     //p1 up
@@ -580,8 +588,10 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                     break;
                 case 301:
                     Log.d("MainActivity","MainActivity this is 301 receiverSOS");
+                    String sosName = (String)msg.obj;
+                    Log.d("MainActivity","MainActivity this is 301 sosName="+sosName);
                     //收到当前群组中的SOS信息
-                    receiverSOS();
+                    receiverSOS(sosName);
                     break;
                 case 302:
                     String lowBattery = "current battery is less than 20%";
@@ -590,6 +600,8 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                 case 303:
                     getInstantMessage();
                     break;
+                case 304:
+                    reConnectGrpc();
                 case 401:
                     sendSOS((TalkCloudApp.ImMsgRespData)msg.obj);
                     break;
@@ -610,6 +622,12 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
             public void run() {
                 try{
                     sleep(300);
+                    String text;
+                    if(msg == null){
+                        text = getResources().getString(id);
+                    }else{
+                        text = msg;
+                    }
                     textToSpeech.speak(text, TextToSpeech.QUEUE_FLUSH, null);
                 }catch (Exception e){
                     e.printStackTrace();
@@ -630,7 +648,9 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
         });
 
         try {
+            Log.d("MainActivity","MainActivity this is sendDefaultGroupId and start");
             lockGroupIdResp = future.get();
+            Log.d("MainActivity","MainActivity this is sendDefaultGroupId and end");
         } catch (ExecutionException e) {
             e.printStackTrace();
         } catch (InterruptedException e) {
@@ -679,17 +699,24 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                             Log.d("MainActivity","MainActivity StreamObserver type="+type);
                             if (type == 3) {//在线消息
                                 if(value.getImMsgData().getReceiverType() == 2){
+
                                     Log.d("MainActivity","MainActivity this is data="+value.getImMsgData().getResourcePath());
                                     Log.d("MainActivity","MainActivity this is DefaultGroupId="+UserBean.getUserBean().getDefaultGroupId());
                                     Log.d("MainActivity","MainActivity this is ReceiverId="+value.getImMsgData().getReceiverId());
                                     if(UserBean.getUserBean().getDefaultGroupId() == value.getImMsgData().getReceiverId()){
                                         playBackPosition = 0;
-                                        if(value.getImMsgData().getResourcePath().indexOf("SOS") != -1){
+                                        //if(value.getImMsgData().getResourcePath().indexOf("SOS") != -1){
+                                        if(value.getImMsgData().getMsgType()==SEND_SOS_TYPE){
                                             Log.d("MainActivity","MainActivity StreamObserver SOS 。。。");
-                                            isLoopingSOS = true;
                                             Message message301 = new Message();
                                             message301.what = 301;
+                                            message301.obj = value.getImMsgData().getSenderName();
                                             handler.sendMessage(message301);
+                                        }else if(value.getImMsgData().getMsgType()==CANCEL_SOS_TYPE){
+                                            Log.d("MainActivity","MainActivity StreamObserver cancelSOS 。。。");
+                                            Message message3 = new Message();
+                                            message3.what = 3;
+                                            handler.sendMessage(message3);
                                         }
                                     }
                                     for(int i=0;i<UserBean.getUserBean().getGroupBeanArrayList().size();i++){
@@ -745,6 +772,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                         @Override
                         public void onCompleted() {
                             Log.d("MainActivity","MainActivity StreamObserver onCompleted");
+                            reConnectGrpc();
                         }
                     };
                     ManagedChannel channel = GrpcConnectionManager.getInstance().getManagedChannel();
@@ -754,9 +782,12 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                     TalkCloudApp.ImMsgReqData data = TalkCloudApp.ImMsgReqData.newBuilder().setId(1).setReceiverType(1).setReceiverId(1)
                             .setResourcePath("").setMsgType(1).build();
                     TalkCloudApp.StreamRequest value = TalkCloudApp.StreamRequest.newBuilder().setUid(UserBean.getUserBean().getUserId()).setDataType(2).build();
+                    Log.d("MainActivity","MainActivity getInstantMessage and 1111111111");
                     request.onNext(value);
                     request.onCompleted();
+                    Log.d("MainActivity","MainActivity getInstantMessage and 222222222");
                 }catch (Exception e){
+                    Log.d("MainActivity","MainActivity this is  getInstantMessage and e= "+e.getMessage());
                     e.printStackTrace();
                 }
             }
@@ -822,9 +853,32 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
         }
     }
 
-    public void handleSOSTaskBack() {
-        TalkCloudApp.ImMsgReqData data = TalkCloudApp.ImMsgReqData.newBuilder().setId(UserBean.getUserBean().getUserId()).setSenderName(UserBean.getUserBean().getUserName()).
-                setReceiverId(UserBean.getUserBean().getDefaultGroupId()).setReceiverType(2).setMsgType(1).setMsgCode("").setResourcePath("SOS").setSendTime("").build();
+    private void receiverSOS(String name){
+         myToast(0,name+" sos");
+        handler.removeMessages(301);
+         Message message = Message.obtain();
+         message.what = 301;
+         message.obj = name;
+         handler.sendMessageDelayed(message,5*1000);
+    }
+
+    private void cancelSOS(){
+        Log.d("MainActivity","MainActivity this is cancelSOS");
+        handleSOSTaskBack(CANCEL_SOS_TYPE);
+    }
+    private void reConnectGrpc(){
+        Log.d("MainActivity","MainActivity this is reConnectGrpc "+AppTools.isNetworkConnected(this));
+        if(AppTools.isNetworkConnected(this)){
+            Message message = Message.obtain();
+            message.what = 303;
+            handler.sendMessageDelayed(message,3*1000);
+        }
+    }
+
+    public void handleSOSTaskBack(int msgType) {
+        TalkCloudApp.ImMsgReqData data = TalkCloudApp.ImMsgReqData.newBuilder().setId(UserBean.getUserBean().getUserId()).setSenderName(UserBean.getUserBean().getNickName()).
+                setReceiverId(UserBean.getUserBean().getDefaultGroupId()).setReceiverType(2).setMsgType(msgType).setMsgCode("").setResourcePath("SOS").setSendTime("").build();
+
         try {
             GrpcConnectionManager.getInstance().getGrpcInstantRequestHandler().submit(new Runnable() {
                 @Override
@@ -852,22 +906,5 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
             myToast(R.string.app_name,lockGroupIdResp.getResult().getMsg());
             return;
         }
-        receiverSOS();
-    }
-
-    private void receiverSOS(){
-         myToast(0,"this is sos");
-         if(isLoopingSOS){
-             Message message = Message.obtain();
-             message.what = 301;
-             handler.sendMessageDelayed(message,8*1000);
-         }
-
-    }
-
-    private void reConnectGrpc(){
-        Message message = Message.obtain();
-        message.what = 303;
-        handler.sendMessageDelayed(message,3*1000);
     }
 }
