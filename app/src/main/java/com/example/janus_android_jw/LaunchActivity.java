@@ -20,6 +20,7 @@ import android.widget.Toast;
 import com.example.janus_android_jw.bean.GroupBean;
 import com.example.janus_android_jw.bean.UserBean;
 import com.example.janus_android_jw.tool.AppTools;
+import com.example.janus_android_jw.tool.DownloadUtils;
 import com.example.janus_android_jw.tool.GrpcConnectionManager;
 
 import org.w3c.dom.Text;
@@ -56,6 +57,7 @@ public class LaunchActivity extends AppCompatActivity implements TextToSpeech.On
             GrpcConnectionManager.initGrpcConnectionManager();
             //todo
             handleLoginTaskBack();
+            //checkForUpdate();
         } else {
             myToast(R.string.network_unavailable,"");
         }
@@ -77,7 +79,10 @@ public class LaunchActivity extends AppCompatActivity implements TextToSpeech.On
     }
 
     private void checkForUpdate() {
-
+        //http://113.105.153.240:82/group1/M00/00/16/cWmZ8FzUDHmAJBRBAP12mgr0KgU904.apk
+        Log.e("janus---","checkForUpdate");
+        DownloadUtils downloadUtils = new DownloadUtils(LaunchActivity.this);
+        downloadUtils.downloadAPK("http://113.105.153.240:82/group1/M00/00/16/cWmZ8FzUDHmAJBRBAP12mgr0KgU904.apk","jimitalk.apk");
     }
 
     public void handleLoginTaskBack() {

@@ -499,6 +499,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                         case NetworkUtil.TYPE_NONE:
                             //断网了
                             network = false;
+                            myToast(R.string.network_unavailable,null);
                             break;
                         case NetworkUtil.TYPE_MOBILE:
                             //打开了移动网络和wifi
@@ -526,7 +527,19 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                     break;
                 case 100:
                     myToast(R.string.websocket_connection_fail,null);
-
+                    JanusControl.closeJanusServer();
+                    Thread myThread111=new Thread(){
+                        @Override
+                        public void run() {
+                            try{
+                                sleep(5000);
+                                janusControl.Start();
+                            }catch (Exception e){
+                                e.printStackTrace();
+                            }
+                        }
+                    };
+                    myThread111.start();
                     break;
                 case 201:
                     //切换群组
@@ -585,7 +598,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
     };
 
     private void myToast(int id,String msg){
-        Log.d("MainActivity","MainActivity myToast msg="+msg);
+        Log.e("MainActivity","MainActivity myToast msg="+msg);
         String text;
         if(msg == null){
             text = getResources().getString(id);

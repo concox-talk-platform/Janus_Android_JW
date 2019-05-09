@@ -9,6 +9,7 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Environment;
 import android.speech.tts.TextToSpeech;
+import android.util.Log;
 import android.widget.Toast;
 
 import java.util.Locale;
@@ -30,7 +31,7 @@ public class DownloadUtils  implements TextToSpeech.OnInitListener{
         //创建下载任务
         DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
         //移动网络情况下是否允许漫游
-        request.setAllowedOverRoaming(false);
+        request.setAllowedOverRoaming(true);
 
         //在通知栏中显示，默认就是显示的
         request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE);
@@ -85,6 +86,7 @@ public class DownloadUtils  implements TextToSpeech.OnInitListener{
                     break;
                 //下载失败
                 case DownloadManager.STATUS_FAILED:
+                    Log.e("janus---","download failed");
                     Thread myThread=new Thread(){
                         @Override
                         public void run() {
@@ -107,6 +109,7 @@ public class DownloadUtils  implements TextToSpeech.OnInitListener{
     //下载到本地后执行安装
     private void installAPK() {
         //获取下载文件的Uri
+        Log.e("janus---","install");
         Uri downloadFileUri = downloadManager.getUriForDownloadedFile(downloadId);
         if (downloadFileUri != null) {
             Intent intent= new Intent(Intent.ACTION_VIEW);
