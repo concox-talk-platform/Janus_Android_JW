@@ -96,4 +96,7 @@ public class BluetoothControll {
         }
     };
 
+    public void close(){
+        mContext.unregisterReceiver(receiver);
+    }
 }

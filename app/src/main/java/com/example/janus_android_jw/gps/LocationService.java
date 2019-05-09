@@ -99,7 +99,14 @@ public class LocationService extends Service {
         return super.onStartCommand(intent, flags, startId);
     }
 
-    private HashMap<String, Object> getLocationData(DeviceInfo dInfo, GPSInfo gpsInfo, WifiData wifiInfo, BaseStationInfo bsInfo,BluetoothInfo btInfo) {
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if(mBluetoothControll!=null)
+            mBluetoothControll.close();
+    }
+
+    private HashMap<String, Object> getLocationData(DeviceInfo dInfo, GPSInfo gpsInfo, WifiData wifiInfo, BaseStationInfo bsInfo, BluetoothInfo btInfo) {
         HashMap<String, Object> map = new HashMap<String, Object>();
         Device device = Device.newBuilder().setId(UserBean.getUserBean().getUserId()).setBattery(dInfo.getBattery()).setDeviceType(dInfo.getType()).build();
         GPS gps = GPS.newBuilder().setLocalTime(gpsInfo.getTime()).setLatitude(gpsInfo.getLatitude()).setLongitude(gpsInfo.getLongitude()).setSpeed(gpsInfo.getSpeed())

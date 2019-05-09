@@ -242,7 +242,9 @@ public class JanusPluginHandle {
     }
 
     public void sendMessage(IPluginHandleSendMessageCallbacks obj) {
-        server.sendMessage(TransactionType.plugin_handle_message, id, obj, plugin);
+        executor.execute(() -> {
+            server.sendMessage(TransactionType.plugin_handle_message, id, obj, plugin);
+        });
     }
 
     private VideoCapturer createCameraCapture(CameraEnumerator enumerator) {
@@ -551,6 +553,7 @@ public class JanusPluginHandle {
                     break;
                 case CONNECTED:
                     Log.e("janusServer","-----------webRTC connected------------");
+                    callbacks.onCallbackError("webRtcconnected");
                     break;
                 case NEW:
                     Log.e("janusServer","-----------webRTC new------------");
@@ -563,6 +566,7 @@ public class JanusPluginHandle {
                     break;
                 case FAILED:
                     Log.e("janusServer","-----------webRTC failed------------");
+                    callbacks.onCallbackError("webRtcfailed");
                     break;
                 default:
                     break;

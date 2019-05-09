@@ -32,7 +32,7 @@ public class BatteryReveiver extends BroadcastReceiver {
                 mHandler.sendEmptyMessage(302);
                 isLowPower = true;
             }
-            if(isLowPower&&mBatteryPower>=10){
+            if(isLowPower&&mBatteryPower>=20){
                 isLowPower = false;
             }
         }

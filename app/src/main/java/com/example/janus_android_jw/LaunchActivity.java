@@ -55,7 +55,7 @@ public class LaunchActivity extends AppCompatActivity implements TextToSpeech.On
         if (AppTools.isNetworkConnected(LaunchActivity.this)) {
             GrpcConnectionManager.initGrpcConnectionManager();
             //todo
-            autoLogin();
+            handleLoginTaskBack();
         } else {
             myToast(R.string.network_unavailable,"");
         }
@@ -80,7 +80,7 @@ public class LaunchActivity extends AppCompatActivity implements TextToSpeech.On
 
     }
 
-    private void autoLogin() {
+    public void handleLoginTaskBack() {
         TelephonyManager tm = (TelephonyManager) this.getSystemService(Context.TELEPHONY_SERVICE);
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
             return;
@@ -89,22 +89,25 @@ public class LaunchActivity extends AppCompatActivity implements TextToSpeech.On
         Log.e("--imei-",name);
         String password = "123456";
         TalkCloudApp.LoginReq loginReq = TalkCloudApp.LoginReq.newBuilder().setName(name).setPasswd(password).build();
-        TalkCloudApp.LoginRsp loginRsp = null;
-        Future<TalkCloudApp.LoginRsp> future = GrpcConnectionManager.getInstance().getGrpcInstantRequestHandler().submit(new Callable<TalkCloudApp.LoginRsp>() {
-            @Override
-            public TalkCloudApp.LoginRsp call() {
-                return GrpcConnectionManager.getInstance().getBlockingStub().login(loginReq);
-            }
-        });
-
         try {
-            loginRsp = future.get();
-        } catch (ExecutionException e) {
-            e.printStackTrace();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
+            GrpcConnectionManager.getInstance().getGrpcInstantRequestHandler().submit(new Runnable() {
+                @Override
+                public void run() {
+                    Log.d("MainActivity","MainActivity this is handleLoginTaskBack 1111111");
+                    TalkCloudApp.LoginRsp loginRsp = GrpcConnectionManager.getInstance().getBlockingStub().login(loginReq);
+                    Log.d("MainActivity","MainActivity this is handleLoginTaskBack 222 result="+loginRsp.getRes().getCode());
+                    Message msg = Message.obtain();
+                    msg.obj = loginRsp;
+                    msg.what = 1;   //标志消息的标志
+                    handler.sendMessage(msg);
+                }
+            });
+        } catch (Exception e) {
+            //TODO Nothing here
         }
+    }
 
+    private void autoLogin(TalkCloudApp.LoginRsp loginRsp) {
         if(loginRsp == null){
             myToast(R.string.request_data_null,"");
             return;
@@ -120,6 +123,7 @@ public class LaunchActivity extends AppCompatActivity implements TextToSpeech.On
         UserBean userBean = new UserBean();
         userBean.setUserId(loginRsp.getUserInfo().getId());
         userBean.setUserName(loginRsp.getUserInfo().getUserName());
+        userBean.setNickName(loginRsp.getUserInfo().getNickName());
         userBean.setDefaultGroupId((loginRsp.getUserInfo().getLockGroupId() == 0)?207:loginRsp.getUserInfo().getLockGroupId());
         ArrayList<GroupBean> groupBeanArrayList = new ArrayList<>();
         for (TalkCloudApp.GroupInfo groupRecord: loginRsp.getGroupListList()) {
@@ -159,6 +163,9 @@ public class LaunchActivity extends AppCompatActivity implements TextToSpeech.On
                         textToSpeech = null;
                     }
                     LaunchActivity.this.finish();
+                    break;
+                case 1:
+                    autoLogin((TalkCloudApp.LoginRsp)msg.obj);
                     break;
             }
         }
