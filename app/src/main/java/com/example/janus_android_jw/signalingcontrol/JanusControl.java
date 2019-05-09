@@ -253,13 +253,7 @@ public class JanusControl {
 
         @Override
         public void onRemoteStream(MediaStream stream) {
-            try {
-                JSONObject jsonObject = new JSONObject();
-                jsonObject.put("pocroom", "webRtcisok");
-                controlCallBack.showMessage(jsonObject,null);
-            }catch (Exception e){
 
-            }
         }
 
         @Override
@@ -284,7 +278,24 @@ public class JanusControl {
 
         @Override
         public void onCallbackError(String error) {
+            if(error.indexOf("webRtcfailed") != -1){
+                try {
+                    JSONObject jsonObject = new JSONObject();
+                    jsonObject.put("pocroom", "webRtcfailed");
+                    controlCallBack.showMessage(jsonObject,null);
+                }catch (Exception e){
 
+                }
+            }
+            if(error.indexOf("webRtcconnected") != -1){
+                try {
+                    JSONObject jsonObject = new JSONObject();
+                    jsonObject.put("pocroom", "webRtcisok");
+                    controlCallBack.showMessage(jsonObject,null);
+                }catch (Exception e){
+
+                }
+            }
         }
 
         @Override
