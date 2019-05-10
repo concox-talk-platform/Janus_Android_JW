@@ -62,6 +62,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
     private int playBackPosition = 0;
     private AppRTCAudioManager audioManager = null;
     private MediaPlayer mediaPlayer;
+    private boolean isSenderSOS = false;
 
     private Thread instantMessageThread;
 
@@ -358,7 +359,6 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                 handler.sendMessage(message2);
             }else if("android.intent.action.ext_p1.down".equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
-                cancelSOS();
                 Message message3 = new Message();
                 message3.what = 3;
                 handler.sendMessage(message3);
@@ -443,11 +443,16 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                     JanusControl.sendUnTalk(MainActivity.this);
                     break;
                 case 3:
+                    if(isSenderSOS){
+                        cancelSOS();
+                        isSenderSOS = false;
+                    }
                     handler.removeMessages(301);
                     break;
                 case 4:
                     //sendSOS();
                     handleSOSTaskBack(SEND_SOS_TYPE);
+                    isSenderSOS = true;
                     break;
                 case 5:
                     //p1 up
@@ -457,6 +462,13 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                     //p2 down
                     //change group
                     if(UserBean.getUserBean().getGroupBeanArrayList().size() > 1){
+                        //切换群组，取消之前群组中的sos,
+                        if(isSenderSOS){
+                            cancelSOS();
+                            isSenderSOS = false;
+                        }
+                        handler.removeMessages(301);
+
                         if(position == UserBean.getUserBean().getGroupBeanArrayList().size()-1){
                             position = 0;
                         }else{

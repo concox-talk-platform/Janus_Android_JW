@@ -123,7 +123,9 @@ public class JanusWebsocketMessenger implements IJanusMessenger {
 
     @Override
     public void disconnect() {
-        client.close();
+        if(client != null){
+            client.close();
+        }
     }
 
     @Override
