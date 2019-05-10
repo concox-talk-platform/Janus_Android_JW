@@ -27,7 +27,7 @@ import android.widget.Toast;
 import com.example.janus_android_jw.bean.MessageBean;
 import com.example.janus_android_jw.bean.UserBean;
 import com.example.janus_android_jw.gps.LocationService;
-import com.example.janus_android_jw.receiver.BatteryReveiver;
+import com.example.janus_android_jw.receiver.BatteryReceiver;
 import com.example.janus_android_jw.signalingcontrol.JanusControl;
 import com.example.janus_android_jw.signalingcontrol.MyControlCallBack;
 import com.example.janus_android_jw.tool.AppTools;
@@ -55,7 +55,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
     private static int SEND_SOS_TYPE = 6;
     private static int CANCEL_SOS_TYPE = 7;
     private  MyBroadcastReceiver myBroadcastReceiver;
-    private BatteryReveiver mBatteryReveiver;
+    private BatteryReceiver mBatteryReceiver;
     private TextToSpeech textToSpeech;
     private JanusControl janusControl;
     private int position = 0;
@@ -164,43 +164,42 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
     @Override
     protected void onResume() {
         super.onResume();
-        myBroadcastReceiver = new MyBroadcastReceiver();
-        IntentFilter intentFilter = new IntentFilter();
-        intentFilter.addAction("android.intent.action.ext_ptt.down");
-        intentFilter.addAction("android.intent.action.ext_ptt.longpress");
-        intentFilter.addAction("android.intent.action.ext_ptt.up");
+        if(myBroadcastReceiver == null){
+            myBroadcastReceiver = new MyBroadcastReceiver();
+            IntentFilter intentFilter = new IntentFilter();
+            intentFilter.addAction("android.intent.action.ext_ptt.down");
+            intentFilter.addAction("android.intent.action.ext_ptt.longpress");
+            intentFilter.addAction("android.intent.action.ext_ptt.up");
 
-        intentFilter.addAction("android.intent.action.ext_p1.down");
-        intentFilter.addAction("android.intent.action.ext_p1.longpress");
-        intentFilter.addAction("android.intent.action.ext_p1.up");
+            intentFilter.addAction("android.intent.action.ext_p1.down");
+            intentFilter.addAction("android.intent.action.ext_p1.longpress");
+            intentFilter.addAction("android.intent.action.ext_p1.up");
 
-        intentFilter.addAction("android.intent.action.ext_p2.down");
-        intentFilter.addAction("android.intent.action.ext_p2.longpres");
-        intentFilter.addAction("android.intent.action.ext_p2.up");
+            intentFilter.addAction("android.intent.action.ext_p2.down");
+            intentFilter.addAction("android.intent.action.ext_p2.longpres");
+            intentFilter.addAction("android.intent.action.ext_p2.up");
 
-        intentFilter.addAction("android.intent.action.ext_p3.down");
-        intentFilter.addAction("android.intent.action.ext_p3.longpress");
-        intentFilter.addAction("android.intent.action.ext_p3.up");
+            intentFilter.addAction("android.intent.action.ext_p3.down");
+            intentFilter.addAction("android.intent.action.ext_p3.longpress");
+            intentFilter.addAction("android.intent.action.ext_p3.up");
 
-        intentFilter.addAction("android.intent.action.ext_fun.down");
-        intentFilter.addAction("android.intent.action.ext_fun.longpress");
-        intentFilter.addAction("android.intent.action.ext_fun.up");
+            intentFilter.addAction("android.intent.action.ext_fun.down");
+            intentFilter.addAction("android.intent.action.ext_fun.longpress");
+            intentFilter.addAction("android.intent.action.ext_fun.up");
 
-        intentFilter.addAction("android.net.conn.CONNECTIVITY_CHANGE");
-        registerReceiver(myBroadcastReceiver, intentFilter);
+            intentFilter.addAction("android.net.conn.CONNECTIVITY_CHANGE");
+            registerReceiver(myBroadcastReceiver, intentFilter);
 
-        mBatteryReveiver = new BatteryReveiver(handler);
-        IntentFilter filter2 = new IntentFilter();
-        filter2.addAction(Intent.ACTION_BATTERY_CHANGED);
-        registerReceiver(mBatteryReveiver, filter2);
-
+            mBatteryReceiver = new BatteryReceiver(handler);
+            IntentFilter filter2 = new IntentFilter();
+            filter2.addAction(Intent.ACTION_BATTERY_CHANGED);
+            registerReceiver(mBatteryReceiver, filter2);
+        }
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        unregisterReceiver(myBroadcastReceiver);
-        unregisterReceiver(mBatteryReveiver);
     }
 
     @Override
@@ -290,6 +289,9 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
         close();
         Intent intent = new Intent(this, LocationService.class);
         stopService(intent);
+
+        unregisterReceiver(myBroadcastReceiver);
+        unregisterReceiver(mBatteryReceiver);
     }
 
     private void close(){
@@ -437,7 +439,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                     break;
                 case 2:
                     //ptt up
-                    JanusControl.sendConfigure(MainActivity.this,true);
+                    //JanusControl.sendConfigure(MainActivity.this,true);
                     JanusControl.sendUnTalk(MainActivity.this);
                     break;
                 case 3:
@@ -489,7 +491,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
 
                     break;
                 case 12:
-                    String batteryMsg = "current battery is "+BatteryReveiver.mBatteryPower+"%";
+                    String batteryMsg = "current battery is "+BatteryReceiver.mBatteryPower+"%";
                     myToast(0,batteryMsg);
                     break;
                 case 13:
@@ -565,7 +567,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                     break;
                 case 204:
                     //获取讲话权限
-                    JanusControl.sendConfigure(MainActivity.this,false);
+                    //JanusControl.sendConfigure(MainActivity.this,false);
                     sendBroadcast( new Intent("com.dfl.redled.on"));
                     myMediaPlayer("",R.raw.start);
                     break;

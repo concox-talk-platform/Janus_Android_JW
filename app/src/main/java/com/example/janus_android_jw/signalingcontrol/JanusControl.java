@@ -382,6 +382,7 @@ public class JanusControl {
             body.put(REQUEST, "talk");
             body.put("room", roomId);
             body.put("id", userId);
+            body.put("muted", false);
             body.put("display",userName);
             msg.put(MESSAGE, body);
             handle.sendMessage(new IPluginHandleSendMessageCallbacks() {
@@ -418,6 +419,7 @@ public class JanusControl {
             body.put(REQUEST, "untalk");
             body.put("room", roomId);
             body.put("id",userId);
+            body.put("muted", true);
             body.put("display",userName);
             msg.put(MESSAGE, body);
             handle.sendMessage(new IPluginHandleSendMessageCallbacks() {

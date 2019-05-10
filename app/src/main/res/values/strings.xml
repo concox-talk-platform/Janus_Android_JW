@@ -6,5 +6,5 @@
     <string name="have_to_switch">Have to switch</string>
     <string name="entry_room_success">Successful entry into the room</string>
     <string name="entry_room_failure">Failure to enter the room</string>
-    <string name="websocket_connection_fail">webSocket connection fail</string>
+    <string name="websocket_connection_fail">connection fail</string>
 </resources>

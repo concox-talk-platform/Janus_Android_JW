@@ -4,15 +4,14 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Handler;
-import android.util.Log;
 
 
-public class BatteryReveiver extends BroadcastReceiver {
+public class BatteryReceiver extends BroadcastReceiver {
     public static int mBatteryPower;
     private boolean isLowPower;
     private Handler mHandler;
 
-    public BatteryReveiver(Handler handler){
+    public BatteryReceiver(Handler handler){
         mHandler = handler;
     }
     @Override
@@ -26,7 +25,7 @@ public class BatteryReveiver extends BroadcastReceiver {
             int scale = intent.getIntExtra("scale", 100);
             // 在下面会定义这个函数，显示手机当前电量
             mBatteryPower = level * 100 / scale;
-            //Log.d("MainActivity","MainActivity BatteryReveiver mBatteryPower="+mBatteryPower);
+            //Log.d("MainActivity","MainActivity BatteryReceiver mBatteryPower="+mBatteryPower);
             //低电量告警，使用android自带的文字转语音引擎
             if (!isLowPower && mBatteryPower < 20) {
                 mHandler.sendEmptyMessage(302);

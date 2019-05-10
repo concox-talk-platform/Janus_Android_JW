@@ -1,8 +1,10 @@
-package com.example.janus_android_jw;
+package com.example.janus_android_jw.receiver;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+
+import com.example.janus_android_jw.LaunchActivity;
 
 public class BootBroadcastReceiver extends BroadcastReceiver {
     static final String ACTION = "android.intent.action.BOOT_COMPLETED";

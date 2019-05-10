@@ -1,18 +1,16 @@
 package com.example.janus_android_jw.gps;
 
-import android.content.BroadcastReceiver;
 import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.os.BatteryManager;
 import android.os.Build;
-import android.speech.tts.TextToSpeech;
+
 import android.support.v4.content.ContextCompat;
 import android.telephony.TelephonyManager;
 import android.util.Log;
 
-import com.example.janus_android_jw.receiver.BatteryReveiver;
+
+import com.example.janus_android_jw.receiver.BatteryReceiver;
 
 import java.util.Locale;
 
@@ -57,7 +55,7 @@ public class DeviceControll{
         info.setImei(getImei(context));
         //info.setBattery(getBattery(context));
         //info.setBattery(mBatteryPower);
-        info.setBattery(BatteryReveiver.mBatteryPower);
+        info.setBattery(BatteryReceiver.mBatteryPower);
         info.setType(getDeviceType());
         return info;
     }
