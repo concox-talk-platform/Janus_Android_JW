@@ -38,7 +38,8 @@ import janusclientapi.PluginHandleSendMessageCallbacks;
 public class JanusControl {
     public static final String REQUEST = "request";//信令，join,start,configure等
     public static final String MESSAGE = "message";//封装 json格式的message,通过ws发送的消息
-    public static String JANUS_URI = "ws://113.105.153.240:9188";//websocket server
+    //public static String JANUS_URI = "ws://113.105.153.240:9188";//测试
+    public static String JANUS_URI = "ws://ptt.jimilab.com:9188";//生产
     public static JanusPluginHandle handle = null;
     public static JanusServer janusServer;
     public static MyControlCallBack controlCallBack;

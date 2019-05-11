@@ -714,9 +714,9 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                             if (type == 3) {//在线消息
                                 if(value.getImMsgData().getReceiverType() == 2){
 
-                                    Log.d("MainActivity","MainActivity this is data="+value.getImMsgData().getResourcePath());
-                                    Log.d("MainActivity","MainActivity this is DefaultGroupId="+UserBean.getUserBean().getDefaultGroupId());
-                                    Log.d("MainActivity","MainActivity this is ReceiverId="+value.getImMsgData().getReceiverId());
+                                    Log.e("-janus--","MainActivity this is data="+value.getImMsgData().getResourcePath());
+                                    Log.d("-janus--","MainActivity this is DefaultGroupId="+UserBean.getUserBean().getDefaultGroupId());
+                                    Log.d("-janus--","MainActivity this is ReceiverId="+value.getImMsgData().getReceiverId());
                                     if(UserBean.getUserBean().getDefaultGroupId() == value.getImMsgData().getReceiverId()){
                                         playBackPosition = 0;
                                         //if(value.getImMsgData().getResourcePath().indexOf("SOS") != -1){
@@ -733,18 +733,20 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                                             handler.sendMessage(message3);
                                         }
                                     }
-                                    for(int i=0;i<UserBean.getUserBean().getGroupBeanArrayList().size();i++){
-                                        if(UserBean.getUserBean().getGroupBeanArrayList().get(i).getGroupId() == value.getImMsgData().getReceiverId()){
-                                            MessageBean messageBean = new MessageBean();
-                                            messageBean.setType(value.getImMsgData().getMsgType());
-                                            messageBean.setMessage(value.getImMsgData().getResourcePath());
-                                            if(UserBean.getUserBean().getGroupBeanArrayList().get(i).getMessageBeanArrayList() == null){
-                                                ArrayList<MessageBean> messageBeanArrayList = new ArrayList<>();
-                                                UserBean.getUserBean().getGroupBeanArrayList().get(i).setMessageBeanArrayList(messageBeanArrayList);
-                                            }
-                                            UserBean.getUserBean().getGroupBeanArrayList().get(i).getMessageBeanArrayList().add(0,messageBean);
-                                            if(UserBean.getUserBean().getGroupBeanArrayList().get(i).getMessageBeanArrayList().size()>=11){
-                                                UserBean.getUserBean().getGroupBeanArrayList().get(i).getMessageBeanArrayList().remove(10);
+                                    if(value.getImMsgData().getMsgType() == 3){
+                                        for(int i=0;i<UserBean.getUserBean().getGroupBeanArrayList().size();i++){
+                                            if(UserBean.getUserBean().getGroupBeanArrayList().get(i).getGroupId() == value.getImMsgData().getReceiverId()){
+                                                MessageBean messageBean = new MessageBean();
+                                                messageBean.setType(value.getImMsgData().getMsgType());
+                                                messageBean.setMessage(value.getImMsgData().getResourcePath());
+                                                if(UserBean.getUserBean().getGroupBeanArrayList().get(i).getMessageBeanArrayList() == null){
+                                                    ArrayList<MessageBean> messageBeanArrayList = new ArrayList<>();
+                                                    UserBean.getUserBean().getGroupBeanArrayList().get(i).setMessageBeanArrayList(messageBeanArrayList);
+                                                }
+                                                UserBean.getUserBean().getGroupBeanArrayList().get(i).getMessageBeanArrayList().add(0,messageBean);
+                                                if(UserBean.getUserBean().getGroupBeanArrayList().get(i).getMessageBeanArrayList().size()>=11){
+                                                    UserBean.getUserBean().getGroupBeanArrayList().get(i).getMessageBeanArrayList().remove(10);
+                                                }
                                             }
                                         }
                                     }
@@ -814,6 +816,8 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
     private void playBack(){
         if(UserBean.getUserBean().getGroupBeanArrayList().get(position).getMessageBeanArrayList()!= null){
             if(UserBean.getUserBean().getGroupBeanArrayList().get(position).getMessageBeanArrayList().get(playBackPosition).getType() == 3){
+                Log.e("-janus--",UserBean.getUserBean().getGroupBeanArrayList().get(position).getMessageBeanArrayList().get(playBackPosition).getMessage());
+                Log.e("-janus--",UserBean.getUserBean().getGroupBeanArrayList().get(position).getMessageBeanArrayList().size()+"---"+playBackPosition);
                 myMediaPlayer(UserBean.getUserBean().getGroupBeanArrayList().get(position).getMessageBeanArrayList().get(playBackPosition).getMessage(),0);
                 playBackPosition = playBackPosition + 1;
                 if(playBackPosition >= 10 || playBackPosition == UserBean.getUserBean().getGroupBeanArrayList().get(position).getMessageBeanArrayList().size()){

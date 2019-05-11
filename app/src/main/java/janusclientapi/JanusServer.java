@@ -227,6 +227,7 @@ public class JanusServer implements Runnable, IJanusMessageObserver, IJanusSessi
                     newMessage.put("body", msg.getJSONObject("message"));
                 if (msg.has("jsep"))
                     newMessage.put("jsep", msg.getJSONObject("jsep"));
+                Log.e("---send---",newMessage.toString());
                 serverConnection.sendMessage(newMessage.toString(), sessionId, handle);
             } catch (JSONException ex) {
                 callbacks.onCallbackError(ex.getMessage());
@@ -269,6 +270,7 @@ public class JanusServer implements Runnable, IJanusMessageObserver, IJanusSessi
             msg.put("type", type);//主叫方:0第一次呼叫，2取消     被叫方：1
             msg.put("isVideo", isVideo);//
             msg.put("isAccept", isAccept);//主叫方：0发起，3取消  。被叫方：1拒绝，2接受
+            Log.e("---send----userCall--",msg.toString());
             serverConnection.sendMessage(msg.toString());
         } catch (JSONException ex) {
 

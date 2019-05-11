@@ -11,7 +11,12 @@ public class AppTools {
     private static String appVersion = "1.0.1";
     private static int appVersionCode = 101;
 
-    public static String host = "113.105.153.240";
+    //测试
+    //public static String host = "113.105.153.240";
+    //public static int port = 9001;
+
+    //生产
+    public static String host = "ptt.jimilab.com";
     public static int port = 9001;
 
 
