@@ -66,13 +66,36 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
 
     private Thread instantMessageThread;
 
-    private Button button1 = null;
-    private Button button2 = null;
-    private Button button3 = null;
-    private Button button4 = null;
-    private Button button5 = null;
+    private Button buttonSOS = null;
+    private Button buttonSwitchGroup = null;
+    private Button buttonPPT = null;
+    private Button buttonPlayBack = null;
+    private Button buttonBattery = null;
 
     private boolean network = true;
+
+    //按键实际在设备中没有用到 仅仅是为了在手机APP上模拟相应按键效果 后续可以考虑直接sendMsg给handle去处理
+    public static final String BROADCAST_BUTTON_SOS_PRESS_LONG = "android.intent.action.ext_p1.longpress";
+    public static final String BROADCAST_BUTTON_SOS_PRESS_DOWN = "android.intent.action.ext_p1.down";
+    public static final String BROADCAST_BUTTON_SOS_PRESS_UP = "android.intent.action.ext_p1.up";
+
+    public static final String BROADCAST_BUTTON_SWITCHGROUP_PRESS_LONG = "android.intent.action.ext_p2.longpress";
+    public static final String BROADCAST_BUTTON_SWITCHGROUP_PRESS_DOWN = "android.intent.action.ext_p2.down";
+    public static final String BROADCAST_BUTTON_SWITCHGROUP_PRESS_UP = "android.intent.action.ext_p2.up";
+
+    public static final String BROADCAST_BUTTON_PPT_PRESS_LONG = "android.intent.action.ext_ptt.longpress";
+    public static final String BROADCAST_BUTTON_PPT_PRESS_DOWN = "android.intent.action.ext_ptt.down";
+    public static final String BROADCAST_BUTTON_PPT_PRESS_UP = "android.intent.action.ext_ptt.up";
+
+    public static final String BROADCAST_BUTTON_PLAYBACK_PRESS_LONG = "android.intent.action.ext_p3.longpress";
+    public static final String BROADCAST_BUTTON_PLAYBACK_PRESS_DOWN = "android.intent.action.ext_p3.down";
+    public static final String BROADCAST_BUTTON_PLAYBACK_PRESS_UP = "android.intent.action.ext_p3.up";
+
+    public static final String BROADCAST_BUTTON_BATTERY_PRESS_LONG = "android.intent.action.ext_fun.longpress";
+    public static final String BROADCAST_BUTTON_BATTERY_PRESS_DOWN = "android.intent.action.ext_fun.down";
+    public static final String BROADCAST_BUTTON_BATTERY_PRESS_UP = "android.intent.action.ext_fun.up";
+
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -98,61 +121,62 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
         //开启即时消息线程
         getInstantMessage();
 
+        //文字转语音
         textToSpeech = new TextToSpeech(this, this);
         janusControl = new JanusControl(this,UserBean.getUserBean().getUserName(),UserBean.getUserBean().getUserId(),UserBean.getUserBean().getDefaultGroupId());
+        //连接janusServer
         janusControl.Start();
 
-        button1 = (Button) findViewById(R.id.button1);
-        button2 = (Button) findViewById(R.id.button2);
-        button3 = (Button) findViewById(R.id.button3);
-        button4 = (Button) findViewById(R.id.button4);
-        button5 = (Button) findViewById(R.id.button5);
+        buttonSOS = (Button) findViewById(R.id.button1);
+        buttonSwitchGroup = (Button) findViewById(R.id.button2);
+        buttonPPT = (Button) findViewById(R.id.button3);
+        buttonPlayBack = (Button) findViewById(R.id.button4);
+        buttonBattery = (Button) findViewById(R.id.button5);
 
-        button1.setOnClickListener(new View.OnClickListener() {
+        buttonSOS.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                sendBroadcast( new Intent("android.intent.action.ext_p1.longpress"));
+                sendBroadcast( new Intent(BROADCAST_BUTTON_SOS_PRESS_LONG));
                 myMediaPlayer("",R.raw.start);
             }
         });
 
-        button2.setOnClickListener(new View.OnClickListener() {
+        buttonSwitchGroup.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                sendBroadcast( new Intent("android.intent.action.ext_p2.down"));
+                sendBroadcast( new Intent(BROADCAST_BUTTON_SWITCHGROUP_PRESS_DOWN));
             }
         });
 
-        button3.setOnTouchListener(new View.OnTouchListener() {
+        buttonPPT.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
                 int action = event.getAction();
                 switch (action) {
                     case MotionEvent.ACTION_DOWN:
-                        sendBroadcast( new Intent("android.intent.action.ext_ptt.down"));
+                        sendBroadcast( new Intent(BROADCAST_BUTTON_PPT_PRESS_DOWN));
                         break;
                     case MotionEvent.ACTION_MOVE:
-
                         break;
                     case MotionEvent.ACTION_UP:
-                        sendBroadcast( new Intent("android.intent.action.ext_ptt.up"));
+                        sendBroadcast( new Intent(BROADCAST_BUTTON_PPT_PRESS_UP));
                         break;
                 }
                 return false;
             }
         });
 
-        button4.setOnClickListener(new View.OnClickListener() {
+        buttonPlayBack.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                sendBroadcast( new Intent("android.intent.action.ext_p3.down"));
+                sendBroadcast( new Intent(BROADCAST_BUTTON_PLAYBACK_PRESS_DOWN));
             }
         });
 
-        button5.setOnClickListener(new View.OnClickListener() {
+        buttonBattery.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                //sendBroadcast( new Intent("android.intent.action.ext_fun.down"));
+                //sendBroadcast( new Intent(BROADCAST_BUTTON_BATTERY_PRESS_DOWN));
                 Message message3 = new Message();
                 message3.what = 3;
                 handler.sendMessage(message3);
@@ -168,25 +192,25 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
         if(myBroadcastReceiver == null){
             myBroadcastReceiver = new MyBroadcastReceiver();
             IntentFilter intentFilter = new IntentFilter();
-            intentFilter.addAction("android.intent.action.ext_ptt.down");
-            intentFilter.addAction("android.intent.action.ext_ptt.longpress");
-            intentFilter.addAction("android.intent.action.ext_ptt.up");
+            intentFilter.addAction(BROADCAST_BUTTON_PPT_PRESS_DOWN);
+            intentFilter.addAction(BROADCAST_BUTTON_PPT_PRESS_LONG);
+            intentFilter.addAction(BROADCAST_BUTTON_PPT_PRESS_UP);
 
-            intentFilter.addAction("android.intent.action.ext_p1.down");
-            intentFilter.addAction("android.intent.action.ext_p1.longpress");
-            intentFilter.addAction("android.intent.action.ext_p1.up");
+            intentFilter.addAction(BROADCAST_BUTTON_SOS_PRESS_DOWN);
+            intentFilter.addAction(BROADCAST_BUTTON_SOS_PRESS_LONG);
+            intentFilter.addAction(BROADCAST_BUTTON_SOS_PRESS_UP);
 
-            intentFilter.addAction("android.intent.action.ext_p2.down");
-            intentFilter.addAction("android.intent.action.ext_p2.longpres");
-            intentFilter.addAction("android.intent.action.ext_p2.up");
+            intentFilter.addAction(BROADCAST_BUTTON_SWITCHGROUP_PRESS_DOWN);
+            intentFilter.addAction(BROADCAST_BUTTON_SWITCHGROUP_PRESS_LONG);
+            intentFilter.addAction(BROADCAST_BUTTON_SWITCHGROUP_PRESS_UP);
 
-            intentFilter.addAction("android.intent.action.ext_p3.down");
-            intentFilter.addAction("android.intent.action.ext_p3.longpress");
-            intentFilter.addAction("android.intent.action.ext_p3.up");
+            intentFilter.addAction(BROADCAST_BUTTON_PLAYBACK_PRESS_DOWN);
+            intentFilter.addAction(BROADCAST_BUTTON_PLAYBACK_PRESS_LONG);
+            intentFilter.addAction(BROADCAST_BUTTON_PLAYBACK_PRESS_UP);
 
-            intentFilter.addAction("android.intent.action.ext_fun.down");
-            intentFilter.addAction("android.intent.action.ext_fun.longpress");
-            intentFilter.addAction("android.intent.action.ext_fun.up");
+            intentFilter.addAction(BROADCAST_BUTTON_BATTERY_PRESS_DOWN);
+            intentFilter.addAction(BROADCAST_BUTTON_BATTERY_PRESS_LONG);
+            intentFilter.addAction(BROADCAST_BUTTON_BATTERY_PRESS_UP);
 
             intentFilter.addAction("android.net.conn.CONNECTIVITY_CHANGE");
             registerReceiver(myBroadcastReceiver, intentFilter);
@@ -207,6 +231,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
     public void janusServer(int code, String msg) {
         switch (code){
             case 100:
+                //重连
                 Message message100 = new Message();
                 message100.what = 100;
                 handler.sendMessage(message100);
@@ -242,6 +267,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                 }
                 if (msg.has("talkfreed")){
                     if(msg.getInt("talkfreed") != UserBean.getUserBean().getUserId()){
+                        //讲话结束
                         Message message207 = new Message();
                         message207.what = 207;
                         handler.sendMessage(message207);
@@ -342,77 +368,77 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
         @Override
         public void onReceive(Context context, Intent intent) {
             Log.d("MainActivity","MainActivity intent="+intent.getAction());
-            if("android.intent.action.ext_ptt.down".equals(intent.getAction())){
+            if(BROADCAST_BUTTON_PPT_PRESS_DOWN.equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
                 Message message0 = new Message();
                 message0.what = 0;
                 handler.sendMessage(message0);
-            }else if("android.intent.action.ext_ptt.longpress".equals(intent.getAction())){
+            }else if(BROADCAST_BUTTON_PPT_PRESS_LONG.equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
                 Message message1 = new Message();
                 message1.what = 1;
                 handler.sendMessage(message1);
-            }else if("android.intent.action.ext_ptt.up".equals(intent.getAction())){
+            }else if(BROADCAST_BUTTON_PPT_PRESS_UP.equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
                 Message message2 = new Message();
                 message2.what = 2;
                 handler.sendMessage(message2);
-            }else if("android.intent.action.ext_p1.down".equals(intent.getAction())){
+            }else if(BROADCAST_BUTTON_SOS_PRESS_DOWN.equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
                 Message message3 = new Message();
                 message3.what = 3;
                 handler.sendMessage(message3);
-            }else if("android.intent.action.ext_p1.longpress".equals(intent.getAction())){
+            }else if(BROADCAST_BUTTON_SOS_PRESS_LONG.equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
                 Message message4 = new Message();
                 message4.what = 4;
                 handler.sendMessage(message4);
-            }else if("android.intent.action.ext_p1.up".equals(intent.getAction())){
+            }else if(BROADCAST_BUTTON_SOS_PRESS_UP.equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
                 Message message5 = new Message();
                 message5.what = 5;
                 handler.sendMessage(message5);
-            }else if("android.intent.action.ext_p2.down".equals(intent.getAction())){
+            }else if(BROADCAST_BUTTON_SWITCHGROUP_PRESS_DOWN.equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
                 Message message6 = new Message();
                 message6.what = 6;
                 handler.sendMessage(message6);
-            }else if("android.intent.action.ext_p2.longpres".equals(intent.getAction())){
+            }else if(BROADCAST_BUTTON_SWITCHGROUP_PRESS_LONG.equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
                 Message message7 = new Message();
                 message7.what = 7;
                 handler.sendMessage(message7);
-            }else if("android.intent.action.ext_p2.up".equals(intent.getAction())){
+            }else if(BROADCAST_BUTTON_SWITCHGROUP_PRESS_UP.equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
                 Message message8 = new Message();
                 message8.what = 8;
                 handler.sendMessage(message8);
-            }else if("android.intent.action.ext_p3.down".equals(intent.getAction())){
+            }else if(BROADCAST_BUTTON_PLAYBACK_PRESS_DOWN.equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
                 Message message9 = new Message();
                 message9.what = 9;
                 handler.sendMessage(message9);
-            }else if("android.intent.action.ext_p3.longpress".equals(intent.getAction())){
+            }else if(BROADCAST_BUTTON_PLAYBACK_PRESS_LONG.equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
                 Message message10 = new Message();
                 message10.what = 10;
                 handler.sendMessage(message10);
-            }else if("android.intent.action.ext_p3.up".equals(intent.getAction())){
+            }else if(BROADCAST_BUTTON_PLAYBACK_PRESS_UP.equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
                 Message message11 = new Message();
                 message11.what = 11;
                 handler.sendMessage(message11);
-            }else if("android.intent.action.ext_fun.down".equals(intent.getAction())){
+            }else if(BROADCAST_BUTTON_BATTERY_PRESS_DOWN.equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
                 Message message12 = new Message();
                 message12.what = 12;
                 handler.sendMessage(message12);
-            }else if("android.intent.action.ext_fun.longpress".equals(intent.getAction())){
+            }else if(BROADCAST_BUTTON_BATTERY_PRESS_LONG.equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
                 Message message13 = new Message();
                 message13.what = 13;
                 handler.sendMessage(message13);
-            }else if("android.intent.action.ext_fun.up".equals(intent.getAction())){
+            }else if(BROADCAST_BUTTON_BATTERY_PRESS_UP.equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
                 Message message14 = new Message();
                 message14.what = 14;
