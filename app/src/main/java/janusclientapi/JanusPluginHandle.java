@@ -26,7 +26,7 @@ import java.util.regex.Pattern;
  */
 public class JanusPluginHandle {
 
-    private  MediaStream myStream = null;
+    //private  MediaStream myStream = null;
     private  MediaStream remoteStream = null;
     private  SessionDescription mySdp = null;
     private  static PeerConnection pc = null;
@@ -96,17 +96,23 @@ public class JanusPluginHandle {
     }
     public void createPeerConnectionFactory(Context context) {
         executor.execute(() -> {
-            _context =  context;
-            PeerConnectionFactory.initialize(PeerConnectionFactory.InitializationOptions.builder(_context)
-                    .createInitializationOptions());
+            if(sessionFactory == null){
+                _context =  context;
+                PeerConnectionFactory.initialize(PeerConnectionFactory.InitializationOptions.builder(_context)
+                        .createInitializationOptions());
 
-            PeerConnectionFactory.Options options = new PeerConnectionFactory.Options();
-            sessionFactory = PeerConnectionFactory.builder()
-                    .setOptions(options)
-                    .setAudioDeviceModule(JavaAudioDeviceModule.builder(_context).createAudioDeviceModule())
-                    .createPeerConnectionFactory();
+                PeerConnectionFactory.Options options = new PeerConnectionFactory.Options();
+                sessionFactory = PeerConnectionFactory.builder()
+                        .setOptions(options)
+                        .setAudioDeviceModule(JavaAudioDeviceModule.builder(_context).createAudioDeviceModule())
+                        .createPeerConnectionFactory();
+            }
         });
     }
+
+    private AudioTrack audioTrack = null;
+    private VideoTrack videoTrack = null;
+    private MediaStream stream = null;
 
     //创建peerConnection
     public void createPeerConnection(IPluginHandleWebRTCCallbacks callbacks) {
@@ -115,9 +121,7 @@ public class JanusPluginHandle {
             pc = sessionFactory.createPeerConnection(rtcConfig, new WebRtcObserver(callbacks));
 
             trickle = callbacks.getTrickle() != null ? callbacks.getTrickle() : false;
-            AudioTrack audioTrack = null;
-            VideoTrack videoTrack = null;
-            MediaStream stream = null;
+
             if (callbacks.getMedia().getSendAudio()) {
                 audioSource = sessionFactory.createAudioSource(new MediaConstraints());
                 audioTrack = sessionFactory.createAudioTrack(AUDIO_TRACK_ID, audioSource);
@@ -152,12 +156,16 @@ public class JanusPluginHandle {
                     stream.addTrack(videoTrack);
                 }
             }
-            myStream = stream;
+//            myStream = stream;
+//            if (stream != null) {
+//                onLocalStream(stream);
+//            }
+//            if (myStream != null) {
+//                pc.addStream(myStream);
+//            }
             if (stream != null) {
                 onLocalStream(stream);
-            }
-            if (myStream != null) {
-                pc.addStream(myStream);
+                pc.addStream(stream);
             }
 
             if (callbacks.getJsep() == null) {
@@ -189,6 +197,24 @@ public class JanusPluginHandle {
         } catch (Exception ex) {
             callbacks.onCallbackError(ex.getMessage());
         }
+    }
+
+    public void addAudioTrack() {
+        executor.execute(() -> {
+            if(stream != null && audioTrack != null){
+                Log.e("--janus--client--audio","------add----------");
+                stream.addTrack(audioTrack);
+            }
+        });
+    }
+
+    public void removeAudioTrack() {
+        executor.execute(() -> {
+            if(stream != null && audioTrack != null) {
+                Log.e("--janus--client--audio", "------remove----------");
+                stream.removeTrack(audioTrack);
+            }
+        });
     }
 
     public void createOffer(IPluginHandleWebRTCCallbacks callbacks) {
@@ -244,6 +270,12 @@ public class JanusPluginHandle {
     public void sendMessage(IPluginHandleSendMessageCallbacks obj) {
         executor.execute(() -> {
             server.sendMessage(TransactionType.plugin_handle_message, id, obj, plugin);
+        });
+    }
+
+    public void sendClaim(IPluginHandleSendMessageCallbacks obj) {
+        executor.execute(() -> {
+            server.sendClaim(TransactionType.claim, id, obj, plugin);
         });
     }
 
@@ -310,10 +342,10 @@ public class JanusPluginHandle {
             pc = null;
         }
 
-       if (sessionFactory != null) {
-           sessionFactory.dispose();
-           sessionFactory = null;
-       }
+//       if (sessionFactory != null) {
+//           sessionFactory.dispose();
+//           sessionFactory = null;
+//       }
 
        mySdp = null;
        if (dataChannel != null)
@@ -602,7 +634,19 @@ public class JanusPluginHandle {
         @Override
         public void onIceCandidate(IceCandidate candidate) {
             if(trickle){
-                sendTrickleCandidate(candidate);
+                Thread thread = new Thread(){
+                    @Override
+                    public void run() {
+                        super.run();
+                        try {
+                            Thread.sleep(Long.parseLong("100"));
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                        sendTrickleCandidate(candidate);
+                    }
+                };
+                thread.start();
             }
         }
 

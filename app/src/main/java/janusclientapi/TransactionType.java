@@ -11,5 +11,6 @@ public enum TransactionType {
     plugin_handle_message,
     plugin_handle_webrtc_message,
     user_call,
-    user_called
+    user_called,
+    claim
 }

@@ -8,6 +8,7 @@ import android.os.Bundle;
 
 import com.example.janus_android_jw.bean.UserBean;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.webrtc.EglBase;
 import org.webrtc.MediaStream;
@@ -38,8 +39,8 @@ import janusclientapi.PluginHandleSendMessageCallbacks;
 public class JanusControl {
     public static final String REQUEST = "request";//信令，join,start,configure等
     public static final String MESSAGE = "message";//封装 json格式的message,通过ws发送的消息
-    //public static String JANUS_URI = "ws://113.105.153.240:9188";//测试
-    public static String JANUS_URI = "ws://ptt.jimilab.com:9188";//生产
+    public static String JANUS_URI = "ws://113.105.153.240:9188";//测试
+    //public static String JANUS_URI = "ws://ptt.jimilab.com:9188";//生产---23.98.41.159
     public static JanusPluginHandle handle = null;
     public static JanusServer janusServer;
     public static MyControlCallBack controlCallBack;
@@ -59,9 +60,9 @@ public class JanusControl {
         janusServer = new JanusServer(new JanusGlobalCallbacks(),userId);
     }
 
-    public void Start() {
+    public void Start(boolean isReCon) {
         if(janusServer != null) {
-            janusServer.Connect();
+            janusServer.Connect(isReCon);
         }
     }
 
@@ -127,7 +128,11 @@ public class JanusControl {
 
         @Override
         public void onCallbackError(String error) {
-            controlCallBack.janusServer(100,error);
+            if(error.equals("isReConnectOk")){
+                controlCallBack.janusServer(102,error);
+            }else{
+                controlCallBack.janusServer(100,error);
+            }
         }
     }
 
@@ -168,6 +173,19 @@ public class JanusControl {
             handle.hangUp();
         }
     }
+
+    public static void stopKeepAliveThread(){
+        if(janusServer != null) {
+            janusServer.stopKeepAliveThread();
+        }
+    }
+
+    public static void createSessionId(){
+        if(janusServer != null) {
+            janusServer.createSession();
+        }
+    }
+
     //关闭webRTC连接，并且关闭插件，
     public static void janusControlDetach(MyControlCallBack myControlCallBack,boolean videoCallToPocRoom){
         isVideoCallToPocRoom = videoCallToPocRoom;
@@ -305,6 +323,14 @@ public class JanusControl {
         }
     }
 
+    //发送心跳，单次
+    public static void sendKeepLiveMessage(){
+        if(janusServer!=null) {
+            janusServer.sendKeepLiveMessage();
+        }
+    }
+
+
     //发送pocRoom Offer信令
     public static void sendPocRoomCreateOffer(final MyControlCallBack myControlCallBack){
         if(handle != null) {
@@ -376,8 +402,9 @@ public class JanusControl {
     }
 
     //发送获取talk权限信令
-    public static void sendTalk(final MyControlCallBack myControlCallBack){
+    public static void sendTalk(final MyControlCallBack myControlCallBack,int curroomid){
         try {
+            roomId = curroomid;
             final JSONObject msg = new JSONObject();
             JSONObject body = new JSONObject();
             body.put(REQUEST, "talk");
@@ -385,6 +412,7 @@ public class JanusControl {
             body.put("id", userId);
             body.put("muted", false);
             body.put("display",userName);
+            body.put("timestamp",System.currentTimeMillis());
             msg.put(MESSAGE, body);
             handle.sendMessage(new IPluginHandleSendMessageCallbacks() {
                 @Override
@@ -393,7 +421,7 @@ public class JanusControl {
                 }
 
                 @Override
-                public void onSuccesAsynchronous() {
+                public void onSuccessAsynchronous() {
 
                 }
 
@@ -413,8 +441,9 @@ public class JanusControl {
     }
 
     //发送unTalk放麦信令
-    public static void sendUnTalk(final MyControlCallBack myControlCallBack){
+    public static void sendUnTalk(final MyControlCallBack myControlCallBack,int curroomid){
         try {
+            roomId = curroomid;
             final JSONObject msg = new JSONObject();
             JSONObject body = new JSONObject();
             body.put(REQUEST, "untalk");
@@ -422,6 +451,7 @@ public class JanusControl {
             body.put("id",userId);
             body.put("muted", true);
             body.put("display",userName);
+            body.put("timestamp",System.currentTimeMillis());
             msg.put(MESSAGE, body);
             handle.sendMessage(new IPluginHandleSendMessageCallbacks() {
                 @Override
@@ -430,7 +460,7 @@ public class JanusControl {
                 }
 
                 @Override
-                public void onSuccesAsynchronous() {
+                public void onSuccessAsynchronous() {
 
                 }
 
@@ -466,7 +496,7 @@ public class JanusControl {
                 }
 
                 @Override
-                public void onSuccesAsynchronous() {
+                public void onSuccessAsynchronous() {
 
                 }
 
@@ -504,7 +534,7 @@ public class JanusControl {
                 }
 
                 @Override
-                public void onSuccesAsynchronous() {
+                public void onSuccessAsynchronous() {
 
                 }
 
@@ -523,24 +553,53 @@ public class JanusControl {
         }
     }
 
-    //发送配置信令，muted，切换静音
-    public static void sendLeave(final MyControlCallBack myControlCallBack,int leaveRoomId){
+    public static void sendClaim(final MyControlCallBack myControlCallBack){
         try {
             controlCallBack = myControlCallBack;
-            final JSONObject msg = new JSONObject();
-            JSONObject body = new JSONObject();
-            body.put(REQUEST, "leave");
-            body.put("room", leaveRoomId);
-            body.put("display", userName);
-            msg.put(MESSAGE, body);
-            handle.sendMessage(new IPluginHandleSendMessageCallbacks() {
+            handle.sendClaim(new IPluginHandleSendMessageCallbacks() {
                 @Override
                 public void onSuccessSynchronous(JSONObject obj) {
                     myControlCallBack.showMessage(obj,null);
                 }
 
                 @Override
-                public void onSuccesAsynchronous() {
+                public void onSuccessAsynchronous() {
+
+                }
+
+                @Override
+                public JSONObject getMessage() {
+                    return null;
+                }
+
+                @Override
+                public void onCallbackError(String error) {
+                    try {
+                        myControlCallBack.showMessage(new JSONObject(error),null);
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                }
+            });
+        }catch (Exception ex) {
+
+        }
+    }
+
+    public static void sendLeave(final MyControlCallBack myControlCallBack){
+        try {
+            controlCallBack = myControlCallBack;
+            final JSONObject msg = new JSONObject();
+            JSONObject body = new JSONObject();
+            body.put(REQUEST, "leave");
+            msg.put(MESSAGE, body);
+            handle.sendMessage(new IPluginHandleSendMessageCallbacks() {
+                @Override
+                public void onSuccessSynchronous(JSONObject obj) {
+                    myControlCallBack.showMessage(obj,null);
+                }
+                @Override
+                public void onSuccessAsynchronous() {
 
                 }
 
@@ -576,7 +635,7 @@ public class JanusControl {
                 }
 
                 @Override
-                public void onSuccesAsynchronous() {
+                public void onSuccessAsynchronous() {
 
                 }
 
@@ -977,6 +1036,19 @@ public class JanusControl {
 
         }
     }
+
+    public static void setRemoveAudioTrack(){
+        if(handle != null) {
+            handle.removeAudioTrack();
+        }
+    }
+
+    public static void setAddAudioTrack(){
+        if(handle != null) {
+            handle.addAudioTrack();
+        }
+    }
+
     /**
      * video Call插件----
      * */

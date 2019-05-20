@@ -22,22 +22,26 @@ public class JanusSendPluginMessageTransaction implements ITransactionCallbacks 
             JanusMessageType type = JanusMessageType.fromString(obj.getString("janus"));
             switch (type) {
                 case success: {
-                    JSONObject plugindata = obj.getJSONObject("plugindata");
-                    JanusSupportedPluginPackages plugin = JanusSupportedPluginPackages.fromString(plugindata.getString("plugin"));
-                    JSONObject data = plugindata.getJSONObject("data");
-                    if (plugin == JanusSupportedPluginPackages.JANUS_NONE) {
-                        callbacks.onCallbackError("unexpected message: \n\t" + obj.toString());
-                    } else {
-                        callbacks.onSuccessSynchronous(data);
+                    if(obj.has("plugindata")){
+                        JSONObject plugindata = obj.getJSONObject("plugindata");
+                        JanusSupportedPluginPackages plugin = JanusSupportedPluginPackages.fromString(plugindata.getString("plugin"));
+                        JSONObject data = plugindata.getJSONObject("data");
+                        if (plugin == JanusSupportedPluginPackages.JANUS_NONE) {
+                            callbacks.onCallbackError("unexpected message: \n\t" + obj.toString());
+                        } else {
+                            callbacks.onSuccessSynchronous(data);
+                        }
+                    }else{
+                        callbacks.onSuccessSynchronous(new JSONObject().put("claim","success"));
                     }
                     break;
                 }
                 case ack: {
-                    callbacks.onSuccesAsynchronous();
+                    callbacks.onSuccessAsynchronous();
                     break;
                 }
                 default: {
-                    callbacks.onCallbackError(obj.getJSONObject("error").getString("reason"));
+                    callbacks.onCallbackError(obj.toString());
                     break;
                 }
             }

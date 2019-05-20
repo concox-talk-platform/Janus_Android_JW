@@ -19,7 +19,7 @@ public class PluginHandleSendMessageCallbacks implements IPluginHandleSendMessag
     }
 
     @Override
-    public void onSuccesAsynchronous() {
+    public void onSuccessAsynchronous() {
     }
 
     @Override

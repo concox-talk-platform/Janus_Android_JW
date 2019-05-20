@@ -12,12 +12,12 @@ public class AppTools {
     private static int appVersionCode = 101;
 
     //测试
-    //public static String host = "113.105.153.240";
-    //public static int port = 9001;
+    public static String host = "113.105.153.240";
+    public static int port = 9001;
 
     //生产
-    public static String host = "ptt.jimilab.com";
-    public static int port = 9001;
+    //public static String host = "ptt.jimilab.com";
+    //public static int port = 9001;
 
 
     public static boolean isNetworkConnected(Context context) {

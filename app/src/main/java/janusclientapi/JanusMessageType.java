@@ -22,6 +22,7 @@ public enum JanusMessageType {
     user_call,
     slowlink,
     timeout,
+    claim,
     user_called;
     @Override
     public String toString() {

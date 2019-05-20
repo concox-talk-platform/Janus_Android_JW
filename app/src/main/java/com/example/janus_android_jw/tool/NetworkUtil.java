@@ -26,14 +26,19 @@ public class NetworkUtil {
         }
 
         int type = activeNetworkInfo.getType();
-        switch (type) {
-            case ConnectivityManager.TYPE_MOBILE:
-                return TYPE_MOBILE;//移动数据
-            case ConnectivityManager.TYPE_WIFI:
-                return TYPE_MOBILE;//WIFI
-            default:
-                break;
+        if(type == ConnectivityManager.TYPE_MOBILE || type == ConnectivityManager.TYPE_WIFI){
+            return TYPE_MOBILE;
+        }else{
+            return TYPE_NONE;
         }
-        return TYPE_NONE;
+//        switch (type) {
+//            case ConnectivityManager.TYPE_MOBILE:
+//                return TYPE_MOBILE;//移动数据
+//            case ConnectivityManager.TYPE_WIFI:
+//                return TYPE_MOBILE;//WIFI
+//            default:
+//                break;
+//        }
+//        return TYPE_NONE;
     }
 }

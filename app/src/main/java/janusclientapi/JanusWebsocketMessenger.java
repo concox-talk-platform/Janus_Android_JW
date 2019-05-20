@@ -80,6 +80,7 @@ public class JanusWebsocketMessenger implements IJanusMessenger {
                 client.setStringCallback(new WebSocket.StringCallback() {
                     @Override
                     public void onStringAvailable(String s) {
+                        //Log.e("--janus-client-recv--", s);
                         onMessage(s);
                     }
                 });
@@ -109,7 +110,7 @@ public class JanusWebsocketMessenger implements IJanusMessenger {
     }
 
     private void onMessage(String message) {
-        Log.d("JANUSCLIENT", "Recv: \n\t" + message);
+        Log.e("--client-recv--", message);
         receivedMessage(message);
     }
 
@@ -130,7 +131,7 @@ public class JanusWebsocketMessenger implements IJanusMessenger {
 
     @Override
     public void sendMessage(String message) {
-        Log.d("JANUSCLIENT", "Sent: \n\t" + message);
+        Log.e("--client-send--", message);
         client.send(message);
     }
 

@@ -42,13 +42,13 @@ public class LocationService extends Service {
             super.handleMessage(msg);
             switch (msg.what) {
                 case 1:
-
+                    Log.e("---janus---","-----开始定位-22-----");
                     DeviceInfo deviceInfo = mDeviceControll.getDeviceDetail(LocationService.this);
                     GPSInfo gpsInfo = mGPSControll.getCurrentLocationInfo();
                     WifiData wifiData = mWifiControll.getWifiData();
                     BaseStationInfo bsInfo = mTelephonyControll.getGSMCellLocationInfo();
                     BluetoothInfo btInfo = mBluetoothControll.getBluetoothStrength();
-                    Log.d("location","LocationService gpsinfo="+gpsInfo);
+                    Log.e("location","LocationService gpsinfo="+gpsInfo);
                     //gps数据为空时，不上传数据
                     if(gpsInfo!=null){
                         new GrpcLocationTask().execute(getLocationData(deviceInfo,gpsInfo,wifiData,bsInfo,btInfo));
@@ -69,7 +69,8 @@ public class LocationService extends Service {
     public void onCreate() {
         super.onCreate();
         init();
-        mHandler.sendEmptyMessageDelayed(1,10*1000);
+        Log.e("---janus---","-----开始定位-11----");
+        mHandler.sendEmptyMessageDelayed(1,60*1000);
         //Toast.makeText(this, "start locationservice", Toast.LENGTH_LONG).show();
     }
 

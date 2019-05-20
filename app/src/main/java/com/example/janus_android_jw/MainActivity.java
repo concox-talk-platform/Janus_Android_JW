@@ -1,22 +1,17 @@
 package com.example.janus_android_jw;
 
-import android.Manifest;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.pm.PackageManager;
 import android.media.MediaPlayer;
-import android.net.ConnectivityManager;
 import android.net.Uri;
+import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.speech.tts.TextToSpeech;
-import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
-import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -42,7 +37,13 @@ import java.util.ArrayList;
 import java.util.Locale;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import io.grpc.ManagedChannel;
 import io.grpc.stub.StreamObserver;
@@ -74,15 +75,19 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
 
     private boolean network = true;
 
+    ExecutorService singleThreadExecutor = Executors.newSingleThreadExecutor();
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
         //获取position
-        for(int i=0;i<UserBean.getUserBean().getGroupBeanArrayList().size();i++){
-            if(UserBean.getUserBean().getDefaultGroupId() == UserBean.getUserBean().getGroupBeanArrayList().get(i).getGroupId()){
-                position = i;
+        if(UserBean.getUserBean().getGroupBeanArrayList() !=null){
+            for(int i=0;i<UserBean.getUserBean().getGroupBeanArrayList().size();i++){
+                if(UserBean.getUserBean().getDefaultGroupId() == UserBean.getUserBean().getGroupBeanArrayList().get(i).getGroupId()){
+                    position = i;
+                }
             }
         }
 
@@ -100,7 +105,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
 
         textToSpeech = new TextToSpeech(this, this);
         janusControl = new JanusControl(this,UserBean.getUserBean().getUserName(),UserBean.getUserBean().getUserId(),UserBean.getUserBean().getDefaultGroupId());
-        janusControl.Start();
+        janusControl.Start(false);
 
         button1 = (Button) findViewById(R.id.button1);
         button2 = (Button) findViewById(R.id.button2);
@@ -153,13 +158,13 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
             @Override
             public void onClick(View v) {
                 //sendBroadcast( new Intent("android.intent.action.ext_fun.down"));
-                Message message3 = new Message();
+                Message message3 = Message.obtain();
                 message3.what = 3;
                 handler.sendMessage(message3);
             }
         });
-        Intent intent = new Intent(this, LocationService.class);
-        startService(intent);
+        //Intent intent = new Intent(this, LocationService.class);
+        //startService(intent);
     }
 
     @Override
@@ -177,7 +182,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
             intentFilter.addAction("android.intent.action.ext_p1.up");
 
             intentFilter.addAction("android.intent.action.ext_p2.down");
-            intentFilter.addAction("android.intent.action.ext_p2.longpres");
+            intentFilter.addAction("android.intent.action.ext_p2.longpress");
             intentFilter.addAction("android.intent.action.ext_p2.up");
 
             intentFilter.addAction("android.intent.action.ext_p3.down");
@@ -207,12 +212,21 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
     public void janusServer(int code, String msg) {
         switch (code){
             case 100:
-                Message message100 = new Message();
-                message100.what = 100;
-                handler.sendMessage(message100);
+                Log.e("-janus------","-----100的错误-----"+msg);
+                if(msg.indexOf("Exception: null") == -1) {
+                    Message message100 = Message.obtain();
+                    message100.what = 100;
+                    handler.sendMessage(message100);
+                }
                 break;
             case 101:
+                //webSocket 连接
                 JanusControl.sendAttachPocRoomPlugin(this,false);
+                break;
+            case 102:
+                //webSocket 重新连接
+                Log.e("-janus------","-----重新连接成功，发送Claim-----");
+                JanusControl.sendClaim(MainActivity.this);
                 break;
         }
     }
@@ -220,65 +234,105 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
     @Override
     public void showMessage(JSONObject msg, JSONObject jsepLocal) {
         try {
-            if (msg.getString("pocroom").equals("audiobridgeisok")) {
-                Log.e("-pocroom------",msg.getString("pocroom"));
-                JanusControl.janusControlCreatePeerConnectionFactory(MainActivity.this);
-                JanusControl.sendPocRoomJoinRoom(MainActivity.this,UserBean.getUserBean().getDefaultGroupId());
-            }else if(msg.getString("pocroom").equals("joined")){
-                Log.e("-pocroom------",msg.getString("pocroom"));
-                if(msg.has("id") && msg.getInt("id") == UserBean.getUserBean().getUserId() ){
-                    JanusControl.sendPocRoomCreateOffer(MainActivity.this);
-                }
-            }else if(msg.getString("pocroom").equals("event")){
-                Log.e("-pocroom------",msg.getString("pocroom"));
-                if(msg.has("error_code") && msg.getInt("error_code") ==490){
-                    //已经在房间，直接建立webRTC连接
-                    JanusControl.sendPocRoomCreateOffer(MainActivity.this);
-                }else if(msg.has("error_code") && msg.getInt("error_code") ==487 ){
-                    //不在房间，加入房间
+            if(msg.has("error") && msg.getJSONObject("error").has("code") && msg.getJSONObject("error").getInt("code") == 458){
+                //No such session
+                //关闭心跳，重新创建session
+                JanusControl.closeWebRtc();
+                JanusControl.stopKeepAliveThread();
+                JanusControl.createSessionId();
+            }else if(msg.has("claim")){
+                // session 未超时 离开房间
+                JanusControl.sendLeave(MainActivity.this);
+            }else{
+                if (msg.getString("pocroom").equals("audiobridgeisok")) {
+                    Log.e("-pocroom------",msg.getString("pocroom"));
+                    JanusControl.janusControlCreatePeerConnectionFactory(MainActivity.this);
                     JanusControl.sendPocRoomJoinRoom(MainActivity.this,UserBean.getUserBean().getDefaultGroupId());
-                }else{
+                }else if(msg.getString("pocroom").equals("joined")){
+                    Log.e("-pocroom------",msg.getString("pocroom"));
+                    if(msg.has("id") && msg.getInt("id") == UserBean.getUserBean().getUserId() ){
+                        JanusControl.sendPocRoomCreateOffer(MainActivity.this);
+                    }
+                }else if(msg.getString("pocroom").equals("event")){
+                    Log.e("-pocroom------",msg.getString("pocroom"));
+                    if(msg.has("error_code") && msg.getInt("error_code") ==490){
+//                        JanusControl.sendLeave(MainActivity.this);
+                        //JanusControl.sendClaim(MainActivity.this);
+                    }else if(msg.has("error_code") && msg.getInt("error_code") ==487 ){
+                        //"error":"Can't change room (not in a room in the first place)","error_code":487,"
+//                        if(position == 0){
+//                            position = UserBean.getUserBean().getGroupBeanArrayList().size()-1;
+//                        }else{
+//                            position=position-1;
+//                        }
+                        //JanusControl.sendPocRoomJoinRoom(MainActivity.this,UserBean.getUserBean().getDefaultGroupId());
+                    }else{
 
-                }
-                if (msg.has("talkfreed")){
-                    if(msg.getInt("talkfreed") != UserBean.getUserBean().getUserId()){
-                        Message message207 = new Message();
-                        message207.what = 207;
-                        handler.sendMessage(message207);
+                    }
+                    if (msg.has("talkfreed")){
+                        if(msg.getInt("talkfreed") != UserBean.getUserBean().getUserId()){
+                            Message message207 = Message.obtain();
+                            message207.what = 207;
+                            handler.sendMessage(message207);
+                        }
+                    }
+                }else if(msg.getString("pocroom").equals("webRtcisok")){
+                    Log.e("-pocroom------",msg.getString("pocroom"));
+                    Message message202 = Message.obtain();
+                    message202.what = 202;
+                    handler.sendMessage(message202);
+                }else if(msg.getString("pocroom").equals("webRtcfailed")){
+                    //webRtc failed todo webrtc 因为网络中断 ，该怎么操作 心跳重连
+                    if(network){
+                        Thread thread201 = new Thread(){
+                            @Override
+                            public void run() {
+                                super.run();
+                                try {
+                                Thread.currentThread().sleep(5000);
+                                Log.e("---janus---","---re connection webrtc---");
+                                JanusControl.closeWebRtc();
+                                JanusControl.sendPocRoomCreateOffer(MainActivity.this);
+                                } catch (InterruptedException e) {
+                                    e.printStackTrace();
+                                }
+                            }
+                        };
+                        thread201.run();
+                    }
+                }else if (msg.getString("pocroom").equals("roomchanged")) {
+                    Log.e("-pocroom------",msg.getString("pocroom"));
+                    Message message201 = Message.obtain();
+                    message201.what = 201;
+                    handler.sendMessage(message201);
+                }else if(msg.getString("pocroom").equals("talked")){
+                    Log.e("-pocroom------",msg.getString("pocroom"));
+                    if(msg.has("id")){
+                        Message message204 = Message.obtain();
+                        message204.what = 204;
+                        handler.sendMessage(message204);
+                    }else if(msg.has("talkholder")){
+                        Message message205 = Message.obtain();
+                        message205.what = 205;
+                        handler.sendMessage(message205);
+                    }
+                }else if(msg.getString("pocroom").equals("untalked")){
+                    Log.e("-pocroom------",msg.getString("pocroom"));
+                    Message message206 = Message.obtain();
+                    message206.what = 206;
+                    handler.sendMessage(message206);
+                }else if(msg.getString("pocroom").equals("configured")){
+
+                }else if(msg.getString("pocroom").equals("left")){
+                    if(msg.getInt("id") == UserBean.getUserBean().getUserId()){
+                        //自己离开房间
+                        JanusControl.closeWebRtc();
+                        JanusControl.stopKeepAliveThread();
+                        JanusControl.createSessionId();
                     }
                 }
-            }else if(msg.getString("pocroom").equals("webRtcisok")){
-                Log.e("-pocroom------",msg.getString("pocroom"));
-                Message message202 = new Message();
-                message202.what = 202;
-                handler.sendMessage(message202);
-            }else if(msg.getString("pocroom").equals("webRtcfailed")){
-                //webRtc failed
-                JanusControl.sendPocRoomJoinRoom(MainActivity.this,UserBean.getUserBean().getDefaultGroupId());
-            }else if (msg.getString("pocroom").equals("roomchanged")) {
-                Log.e("-pocroom------",msg.getString("pocroom"));
-                Message message201 = new Message();
-                message201.what = 201;
-                handler.sendMessage(message201);
-            }else if(msg.getString("pocroom").equals("talked")){
-                Log.e("-pocroom------",msg.getString("pocroom"));
-                if(msg.has("id")){
-                    Message message204 = new Message();
-                    message204.what = 204;
-                    handler.sendMessage(message204);
-                }else if(msg.has("talkholder")){
-                    Message message205 = new Message();
-                    message205.what = 205;
-                    handler.sendMessage(message205);
-                }
-            }else if(msg.getString("pocroom").equals("untalked")){
-                Log.e("-pocroom------",msg.getString("pocroom"));
-                Message message206 = new Message();
-                message206.what = 206;
-                handler.sendMessage(message206);
-            }else if(msg.getString("pocroom").equals("configured")){
-
             }
+
         } catch (JSONException e) {
             e.printStackTrace();
         }
@@ -288,11 +342,6 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
     protected void onDestroy() {
         super.onDestroy();
         close();
-        Intent intent = new Intent(this, LocationService.class);
-        stopService(intent);
-
-        unregisterReceiver(myBroadcastReceiver);
-        unregisterReceiver(mBatteryReceiver);
     }
 
     private void close(){
@@ -305,6 +354,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
             mediaPlayer = null;
         }
 
+        JanusControl.closeWebRtc();
         JanusControl.closeJanusServer();
         GrpcConnectionManager.closeGrpcConnectionManager();
         UserBean.clearUserBean();
@@ -313,6 +363,14 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
             textToSpeech.shutdown();
             textToSpeech = null;
         }
+
+        singleThreadExecutor.shutdown();
+
+        Intent intent = new Intent(this, LocationService.class);
+        stopService(intent);
+
+        unregisterReceiver(myBroadcastReceiver);
+        unregisterReceiver(mBatteryReceiver);
     }
 
     @Override
@@ -344,82 +402,82 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
             Log.d("MainActivity","MainActivity intent="+intent.getAction());
             if("android.intent.action.ext_ptt.down".equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
-                Message message0 = new Message();
+                Message message0 = Message.obtain();
                 message0.what = 0;
                 handler.sendMessage(message0);
             }else if("android.intent.action.ext_ptt.longpress".equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
-                Message message1 = new Message();
+                Message message1 = Message.obtain();
                 message1.what = 1;
                 handler.sendMessage(message1);
             }else if("android.intent.action.ext_ptt.up".equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
-                Message message2 = new Message();
+                Message message2 = Message.obtain();
                 message2.what = 2;
                 handler.sendMessage(message2);
             }else if("android.intent.action.ext_p1.down".equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
-                Message message3 = new Message();
+                Message message3 = Message.obtain();
                 message3.what = 3;
                 handler.sendMessage(message3);
             }else if("android.intent.action.ext_p1.longpress".equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
-                Message message4 = new Message();
+                Message message4 = Message.obtain();
                 message4.what = 4;
                 handler.sendMessage(message4);
             }else if("android.intent.action.ext_p1.up".equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
-                Message message5 = new Message();
+                Message message5 = Message.obtain();
                 message5.what = 5;
                 handler.sendMessage(message5);
             }else if("android.intent.action.ext_p2.down".equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
-                Message message6 = new Message();
+                Message message6 = Message.obtain();
                 message6.what = 6;
                 handler.sendMessage(message6);
-            }else if("android.intent.action.ext_p2.longpres".equals(intent.getAction())){
+            }else if("android.intent.action.ext_p2.longpress".equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
-                Message message7 = new Message();
+                Message message7 = Message.obtain();
                 message7.what = 7;
                 handler.sendMessage(message7);
             }else if("android.intent.action.ext_p2.up".equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
-                Message message8 = new Message();
+                Message message8 = Message.obtain();
                 message8.what = 8;
                 handler.sendMessage(message8);
             }else if("android.intent.action.ext_p3.down".equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
-                Message message9 = new Message();
+                Message message9 = Message.obtain();
                 message9.what = 9;
                 handler.sendMessage(message9);
             }else if("android.intent.action.ext_p3.longpress".equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
-                Message message10 = new Message();
+                Message message10 = Message.obtain();
                 message10.what = 10;
                 handler.sendMessage(message10);
             }else if("android.intent.action.ext_p3.up".equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
-                Message message11 = new Message();
+                Message message11 = Message.obtain();
                 message11.what = 11;
                 handler.sendMessage(message11);
             }else if("android.intent.action.ext_fun.down".equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
-                Message message12 = new Message();
+                Message message12 = Message.obtain();
                 message12.what = 12;
                 handler.sendMessage(message12);
             }else if("android.intent.action.ext_fun.longpress".equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
-                Message message13 = new Message();
+                Message message13 = Message.obtain();
                 message13.what = 13;
                 handler.sendMessage(message13);
             }else if("android.intent.action.ext_fun.up".equals(intent.getAction())){
                 Log.e("-anniu------",intent.getAction());
-                Message message14 = new Message();
+                Message message14 = Message.obtain();
                 message14.what = 14;
                 handler.sendMessage(message14);
             }else if("android.net.conn.CONNECTIVITY_CHANGE".equals(intent.getAction())){
-                Log.e("-wangluo------",intent.getAction());
-                Message message15 = new Message();
+                Log.e("-wangluo------",intent.getAction()+"---"+NetworkUtil.getNetWorkStates(MainActivity.this));
+                Message message15 = Message.obtain();
                 message15.what = 15;
                 handler.sendMessage(message15);
             }
@@ -431,7 +489,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
             switch (msg.what) {
                 case 0:
                     //ptt down
-                    JanusControl.sendTalk(MainActivity.this);
+                    JanusControl.sendTalk(MainActivity.this,UserBean.getUserBean().getDefaultGroupId());
                     break;
                 case 1:
                     //ptt lang
@@ -440,7 +498,8 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                 case 2:
                     //ptt up
                     //JanusControl.sendConfigure(MainActivity.this,true);
-                    JanusControl.sendUnTalk(MainActivity.this);
+                    JanusControl.setRemoveAudioTrack();
+                    JanusControl.sendUnTalk(MainActivity.this,UserBean.getUserBean().getDefaultGroupId());
                     break;
                 case 3:
                     if(isSenderSOS){
@@ -460,7 +519,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                     break;
                 case 6:
                     //p2 down
-                    //change group
+                    //change group 如果切换失败，position不能增加 todo
                     if(UserBean.getUserBean().getGroupBeanArrayList().size() > 1){
                         //切换群组，取消之前群组中的sos,
                         if(isSenderSOS){
@@ -468,15 +527,13 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                             isSenderSOS = false;
                         }
                         handler.removeMessages(301);
-
-                        if(position == UserBean.getUserBean().getGroupBeanArrayList().size()-1){
-                            position = 0;
+                        int nextPosition = position;
+                        if(nextPosition == UserBean.getUserBean().getGroupBeanArrayList().size()-1){
+                            nextPosition = 0;
                         }else{
-                            position=position+1;
+                            nextPosition=nextPosition+1;
                         }
-                        JanusControl.sendChangeGroup(MainActivity.this,UserBean.getUserBean().getGroupBeanArrayList().get(position).getGroupId() );
-                        UserBean.getUserBean().setDefaultGroupId(UserBean.getUserBean().getGroupBeanArrayList().get(position).getGroupId());
-                        playBackPosition = 0;
+                        JanusControl.sendChangeGroup(MainActivity.this,UserBean.getUserBean().getGroupBeanArrayList().get(nextPosition).getGroupId() );
                     }else{
                         String text = UserBean.getUserBean().getGroupBeanArrayList().get(position).getGroupName();
                         myToast(R.string.app_name,text);
@@ -521,26 +578,21 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                         case NetworkUtil.TYPE_NONE:
                             //断网了
                             network = false;
+                            grpc_keep_alive = false;
+                            if(thread101 !=null){
+                                thread101.interrupt();
+                            }
+                            JanusControl.stopKeepAliveThread();
                             myToast(R.string.network_unavailable,null);
+                            Log.e("-wangluo------","==="+NetworkUtil.getNetWorkStates(MainActivity.this));
                             break;
                         case NetworkUtil.TYPE_MOBILE:
                             //打开了移动网络和wifi
                             if(!network){
-                                JanusControl.closeJanusServer();
-                                Thread myThread11=new Thread(){
-                                    @Override
-                                    public void run() {
-                                        try{
-                                            sleep(5000);
-                                            Log.e("--wangluo--",network+"");
-                                            janusControl.Start();
-                                            getInstantMessage();
-                                        }catch (Exception e){
-                                            e.printStackTrace();
-                                        }
-                                    }
-                                };
-                                myThread11.start();
+                                Log.e("-wangluo------","==="+network+"---开始start,getInstantMessage");
+                                network = true;
+                                janusControl.Start(true);
+                                reConnectGrpc();
                             }
                             break;
                         default:
@@ -548,30 +600,42 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                     }
                     break;
                 case 100:
+                    //心跳 重连
                     myToast(R.string.websocket_connection_fail,null);
-                    JanusControl.closeJanusServer();
-                    Thread myThread111=new Thread(){
-                        @Override
-                        public void run() {
-                            try{
-                                sleep(5000);
-                                janusControl.Start();
-                            }catch (Exception e){
-                                e.printStackTrace();
+                    if(network) {
+                        Thread thread202 = new Thread(){
+                            @Override
+                            public void run() {
+                                super.run();
+                                try {
+                                    Thread.currentThread().sleep(5000);
+                                    Log.e("---janus---","---re connection websocket---");
+                                    janusControl.Start(true);
+                                } catch (InterruptedException e) {
+                                    e.printStackTrace();
+                                }
                             }
-                        }
-                    };
-                    myThread111.start();
+                        };
+                        thread202.start();
+                    }
                     break;
                 case 201:
                     //切换群组
+                    if(position == UserBean.getUserBean().getGroupBeanArrayList().size()-1){
+                        position = 0;
+                    }else{
+                        position=position+1;
+                    }
                     String tips1 = getResources().getString(R.string.have_to_switch)+UserBean.getUserBean().getGroupBeanArrayList().get(position).getGroupName();
                     myToast(R.string.app_name,tips1);
+                    UserBean.getUserBean().setDefaultGroupId(UserBean.getUserBean().getGroupBeanArrayList().get(position).getGroupId());
+                    playBackPosition = 0;
                     sendDefaultGroupId();
                     break;
                 case 202:
                     //进入群组成功
                     myToast(R.string.app_name,"entry into "+UserBean.getUserBean().getGroupBeanArrayList().get(position).getGroupName());
+                    JanusControl.setRemoveAudioTrack();
                     break;
                 case 203:
                     //进入群组失败
@@ -582,6 +646,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                     //JanusControl.sendConfigure(MainActivity.this,false);
                     sendBroadcast( new Intent("com.dfl.redled.on"));
                     myMediaPlayer("",R.raw.start);
+                    JanusControl.setAddAudioTrack();
                     break;
                 case 205:
                     //未获取到讲话权限-有人在讲话-指示灯为绿色开启
@@ -611,11 +676,6 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                     String lowBattery = "current battery is less than 20%";
                     myToast(0,lowBattery);
                     break;
-                case 303:
-                    getInstantMessage();
-                    break;
-                case 304:
-                    reConnectGrpc();
                 case 401:
                     sendSOS((TalkCloudApp.ImMsgRespData)msg.obj);
                     break;
@@ -631,24 +691,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
         }else{
             text = msg;
         }
-        Thread myThread=new Thread(){
-            @Override
-            public void run() {
-                try{
-                    sleep(300);
-                    String text;
-                    if(msg == null){
-                        text = getResources().getString(id);
-                    }else{
-                        text = msg;
-                    }
-                    textToSpeech.speak(text, TextToSpeech.QUEUE_FLUSH, null);
-                }catch (Exception e){
-                    e.printStackTrace();
-                }
-            }
-        };
-        myThread.start();
+        textToSpeech.speak(text, TextToSpeech.QUEUE_FLUSH, null);
     }
 
     private void sendDefaultGroupId(){
@@ -699,119 +742,138 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
     }
 
     //获取IM消息
+    private boolean isSendKeepAlive = false;
+    private boolean grpc_keep_alive = true;
+    Thread thread101 = null;
     public void getInstantMessage(){
-        instantMessageThread = new Thread(){
-            @Override
-            public void run() {
-                try{
-                    StreamObserver<TalkCloudApp.StreamResponse> response = new StreamObserver<TalkCloudApp.StreamResponse>() {
-                        @Override
-                        public void onNext(TalkCloudApp.StreamResponse value) {
-                            network = true;
-                            //接收服务器下发的消息
-                            int type = value.getDataType();
-                            Log.d("MainActivity","MainActivity StreamObserver type="+type);
-                            if (type == 3) {//在线消息
-                                if(value.getImMsgData().getReceiverType() == 2){
+       Thread thread102 = new Thread(){
+           @Override
+           public void run() {
+               super.run();
+               ManagedChannel channel = GrpcConnectionManager.getInstance().getManagedChannel();
+               TalkCloudGrpc.TalkCloudStub stub = TalkCloudGrpc.newStub(channel);
+               StreamObserver<TalkCloudApp.StreamResponse> response = new StreamObserver<TalkCloudApp.StreamResponse>() {
+                   @Override
+                   public void onNext(TalkCloudApp.StreamResponse value) {
+                       //接收服务器下发的消息
+                       int type = value.getDataType();
+                       Log.e("---janus---","----即时消息-Type---"+type);
+                       if (type == 3) {//在线消息
+                           if(value.getImMsgData().getReceiverType() == 2){
+                               if(UserBean.getUserBean().getDefaultGroupId() == value.getImMsgData().getReceiverId()){
+                                   playBackPosition = 0;
+                                   if(value.getImMsgData().getMsgType()==SEND_SOS_TYPE){
+                                       Log.d("MainActivity","MainActivity StreamObserver SOS 。。。");
+                                       Message message301 = Message.obtain();
+                                       message301.what = 301;
+                                       message301.obj = value.getImMsgData().getSenderName();
+                                       handler.sendMessage(message301);
+                                   }else if(value.getImMsgData().getMsgType()==CANCEL_SOS_TYPE){
+                                       Log.d("MainActivity","MainActivity StreamObserver cancelSOS 。。。");
+                                       Message message3 = Message.obtain();
+                                       message3.what = 3;
+                                       handler.sendMessage(message3);
+                                   }
+                               }
+                               if(value.getImMsgData().getMsgType() == 3){
+                                   for(int i=0;i<UserBean.getUserBean().getGroupBeanArrayList().size();i++){
+                                       if(UserBean.getUserBean().getGroupBeanArrayList().get(i).getGroupId() == value.getImMsgData().getReceiverId()){
+                                           MessageBean messageBean = new MessageBean();
+                                           messageBean.setType(value.getImMsgData().getMsgType());
+                                           messageBean.setMessage(value.getImMsgData().getResourcePath());
+                                           if(UserBean.getUserBean().getGroupBeanArrayList().get(i).getMessageBeanArrayList() == null){
+                                               ArrayList<MessageBean> messageBeanArrayList = new ArrayList<>();
+                                               UserBean.getUserBean().getGroupBeanArrayList().get(i).setMessageBeanArrayList(messageBeanArrayList);
+                                           }
+                                           UserBean.getUserBean().getGroupBeanArrayList().get(i).getMessageBeanArrayList().add(0,messageBean);
+                                           if(UserBean.getUserBean().getGroupBeanArrayList().get(i).getMessageBeanArrayList().size()>=11){
+                                               UserBean.getUserBean().getGroupBeanArrayList().get(i).getMessageBeanArrayList().remove(10);
+                                           }
+                                       }
+                                   }
+                               }
+                           }
 
-                                    Log.e("-janus--","MainActivity this is data="+value.getImMsgData().getResourcePath());
-                                    Log.d("-janus--","MainActivity this is DefaultGroupId="+UserBean.getUserBean().getDefaultGroupId());
-                                    Log.d("-janus--","MainActivity this is ReceiverId="+value.getImMsgData().getReceiverId());
-                                    if(UserBean.getUserBean().getDefaultGroupId() == value.getImMsgData().getReceiverId()){
-                                        playBackPosition = 0;
-                                        //if(value.getImMsgData().getResourcePath().indexOf("SOS") != -1){
-                                        if(value.getImMsgData().getMsgType()==SEND_SOS_TYPE){
-                                            Log.d("MainActivity","MainActivity StreamObserver SOS 。。。");
-                                            Message message301 = new Message();
-                                            message301.what = 301;
-                                            message301.obj = value.getImMsgData().getSenderName();
-                                            handler.sendMessage(message301);
-                                        }else if(value.getImMsgData().getMsgType()==CANCEL_SOS_TYPE){
-                                            Log.d("MainActivity","MainActivity StreamObserver cancelSOS 。。。");
-                                            Message message3 = new Message();
-                                            message3.what = 3;
-                                            handler.sendMessage(message3);
-                                        }
-                                    }
-                                    if(value.getImMsgData().getMsgType() == 3){
-                                        for(int i=0;i<UserBean.getUserBean().getGroupBeanArrayList().size();i++){
-                                            if(UserBean.getUserBean().getGroupBeanArrayList().get(i).getGroupId() == value.getImMsgData().getReceiverId()){
-                                                MessageBean messageBean = new MessageBean();
-                                                messageBean.setType(value.getImMsgData().getMsgType());
-                                                messageBean.setMessage(value.getImMsgData().getResourcePath());
-                                                if(UserBean.getUserBean().getGroupBeanArrayList().get(i).getMessageBeanArrayList() == null){
-                                                    ArrayList<MessageBean> messageBeanArrayList = new ArrayList<>();
-                                                    UserBean.getUserBean().getGroupBeanArrayList().get(i).setMessageBeanArrayList(messageBeanArrayList);
-                                                }
-                                                UserBean.getUserBean().getGroupBeanArrayList().get(i).getMessageBeanArrayList().add(0,messageBean);
-                                                if(UserBean.getUserBean().getGroupBeanArrayList().get(i).getMessageBeanArrayList().size()>=11){
-                                                    UserBean.getUserBean().getGroupBeanArrayList().get(i).getMessageBeanArrayList().remove(10);
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
+                       } else if (type == 2) {//离线消息
+                           for (TalkCloudApp.OfflineImMsg offlineImMsg: value.getOfflineImMsgResp().getOfflineGroupImMsgsList()) {
+                               if(offlineImMsg.getMsgReceiverType() == 2){
+                                   for(int i=0;i<UserBean.getUserBean().getGroupBeanArrayList().size();i++){
+                                       if(UserBean.getUserBean().getGroupBeanArrayList().get(i).getGroupId() == offlineImMsg.getGroupId()){
+                                           ArrayList<MessageBean> messageBeanArrayList = new ArrayList<>();
+                                           int msgSize = 0;
+                                           if(offlineImMsg.getImMsgDataList().size()>10){
+                                               msgSize = 10;
+                                           }else{
+                                               msgSize = offlineImMsg.getImMsgDataList().size();
+                                           }
+                                           for(int j=0;j<msgSize;j++){
+                                               MessageBean messageBean = new MessageBean();
+                                               messageBean.setType(offlineImMsg.getImMsgDataList().get(j).getMsgType());
+                                               messageBean.setMessage(offlineImMsg.getImMsgDataList().get(j).getResourcePath());
+                                               messageBeanArrayList.add(messageBean);
+                                           }
+                                           UserBean.getUserBean().getGroupBeanArrayList().get(i).setMessageBeanArrayList(messageBeanArrayList);
+                                       }
+                                   }
+                               }
+                           }
+                       }
+                   }
 
-                            } else if (type == 2) {//离线消息
-                                for (TalkCloudApp.OfflineImMsg offlineImMsg: value.getOfflineImMsgResp().getOfflineGroupImMsgsList()) {
-                                    if(offlineImMsg.getMsgReceiverType() == 2){
-                                        for(int i=0;i<UserBean.getUserBean().getGroupBeanArrayList().size();i++){
-                                            if(UserBean.getUserBean().getGroupBeanArrayList().get(i).getGroupId() == offlineImMsg.getGroupId()){
-                                                ArrayList<MessageBean> messageBeanArrayList = new ArrayList<>();
-                                                int msgSize = 0;
-                                                if(offlineImMsg.getImMsgDataList().size()>10){
-                                                    msgSize = 10;
-                                                }else{
-                                                    msgSize = offlineImMsg.getImMsgDataList().size();
-                                                }
-                                                for(int j=0;j<msgSize;j++){
-                                                    MessageBean messageBean = new MessageBean();
-                                                    messageBean.setType(offlineImMsg.getImMsgDataList().get(j).getMsgType());
-                                                    messageBean.setMessage(offlineImMsg.getImMsgDataList().get(j).getResourcePath());
-                                                    messageBeanArrayList.add(messageBean);
-                                                }
-                                                UserBean.getUserBean().getGroupBeanArrayList().get(i).setMessageBeanArrayList(messageBeanArrayList);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                   @Override
+                   public void onError(Throwable t) {
+                       Log.e("--janus---","---StreamObserver onError---"+t.getMessage());
+                       if(network){
+                           reConnectGrpc();
+                       }
 
-                        @Override
-                        public void onError(Throwable t) {
-                            Log.d("MainActivity","MainActivity StreamObserver onError and "+t.getMessage());
-                            Log.d("MainActivity","MainActivity StreamObserver onError and isNetworkConnected="+ AppTools.isNetworkConnected(MainActivity.this));
-                            reConnectGrpc();
-                        }
+                   }
 
-                        @Override
-                        public void onCompleted() {
-                            Log.d("MainActivity","MainActivity StreamObserver onCompleted");
-                            reConnectGrpc();
-                        }
-                    };
-                    ManagedChannel channel = GrpcConnectionManager.getInstance().getManagedChannel();
-                    TalkCloudGrpc.TalkCloudStub stub = TalkCloudGrpc.newStub(channel);
-                    Log.d("MainActivity","MainActivity deadline = "+stub.getCallOptions().getDeadline());
-                    StreamObserver<TalkCloudApp.StreamRequest> request = stub.dataPublish(response);
-                    TalkCloudApp.ImMsgReqData data = TalkCloudApp.ImMsgReqData.newBuilder().setId(1).setReceiverType(1).setReceiverId(1)
-                            .setResourcePath("").setMsgType(1).build();
-                    TalkCloudApp.StreamRequest value = TalkCloudApp.StreamRequest.newBuilder().setUid(UserBean.getUserBean().getUserId()).setDataType(2).build();
-                    Log.d("MainActivity","MainActivity getInstantMessage and 1111111111");
-                    request.onNext(value);
-                    request.onCompleted();
-                    Log.d("MainActivity","MainActivity getInstantMessage and 222222222");
-                }catch (Exception e){
-                    Log.d("MainActivity","MainActivity this is  getInstantMessage and e= "+e.getMessage());
-                    e.printStackTrace();
-                }
-            }
-        };
-        instantMessageThread.start();
+                   @Override
+                   public void onCompleted() {
+                       Log.e("--janus---","---StreamObserver onCompleted---");
+                       if(network){
+                           reConnectGrpc();
+                       }
+
+                   }
+               };
+               grpc_keep_alive = true;
+               StreamObserver<TalkCloudApp.StreamRequest> request = stub.dataPublish(response);
+               thread101 = new Thread(){
+                   @Override
+                   public void run() {
+                       super.run();
+                       while (grpc_keep_alive){
+                           try {
+                               TalkCloudApp.StreamRequest value = null;
+                               if(isSendKeepAlive){
+                                   Log.e("---janus---","---心跳---");
+                                   try{
+                                       Thread.currentThread().sleep(18*1000);
+                                       value = TalkCloudApp.StreamRequest.newBuilder().setUid(UserBean.getUserBean().getUserId()).setDataType(4).build();
+                                   } catch (InterruptedException e) {
+                                       grpc_keep_alive = false;
+                                   }
+                               }else{
+                                   //发送
+                                   Log.e("---janus---","---离线消息---");
+                                   value = TalkCloudApp.StreamRequest.newBuilder().setUid(UserBean.getUserBean().getUserId()).setDataType(2).build();
+                                   isSendKeepAlive = true;
+                               }
+                               request.onNext(value);
+                           } catch (Exception e) {
+                               e.printStackTrace();
+                           }
+                       }
+                   }
+               };
+               thread101.start();
+           }
+       };
+       thread102.start();
+
     }
-
-    private  String destFileDir = Environment.getExternalStorageDirectory()+"/media";
 
     private void playBack(){
         if(UserBean.getUserBean().getGroupBeanArrayList().get(position).getMessageBeanArrayList()!= null){
@@ -873,7 +935,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
 
     private void receiverSOS(String name){
          myToast(0,name+" sos");
-        handler.removeMessages(301);
+         handler.removeMessages(301);
          Message message = Message.obtain();
          message.what = 301;
          message.obj = name;
@@ -881,15 +943,30 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
     }
 
     private void cancelSOS(){
-        Log.d("MainActivity","MainActivity this is cancelSOS");
         handleSOSTaskBack(CANCEL_SOS_TYPE);
     }
-    private void reConnectGrpc(){
-        Log.d("MainActivity","MainActivity this is reConnectGrpc "+AppTools.isNetworkConnected(this));
-        if(AppTools.isNetworkConnected(this)){
-            Message message = Message.obtain();
-            message.what = 303;
-            handler.sendMessageDelayed(message,3*1000);
+
+    private void reConnectGrpc() {
+        grpc_keep_alive = false;
+        if (thread101 != null) {
+            thread101.interrupt();
+        }
+        if (network) {
+            Thread thread203 = new Thread(){
+                @Override
+                public void run() {
+                    super.run();
+                    try {
+                        Log.e("---janus---", "---re connection grpc 开始睡眠---");
+                        Thread.currentThread().sleep(18 * 1000);
+                        Log.e("---janus---", "---re connection grpc 开始重连---");
+                        getInstantMessage();
+                    } catch(InterruptedException e){
+                        e.printStackTrace();
+                    }
+                }
+            };
+            thread203.start();
         }
     }
 
