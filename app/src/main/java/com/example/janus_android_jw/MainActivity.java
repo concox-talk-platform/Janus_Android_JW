@@ -33,6 +33,7 @@ import com.example.janus_android_jw.signalingcontrol.MyControlCallBack;
 import com.example.janus_android_jw.tool.AppTools;
 import com.example.janus_android_jw.tool.GrpcConnectionManager;
 import com.example.janus_android_jw.tool.NetworkUtil;
+import com.huizhou.jimi.otasdk.update.UpdateManager;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -71,6 +72,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
     private Button buttonPPT = null;
     private Button buttonPlayBack = null;
     private Button buttonBattery = null;
+    private Button buttonCheckUpdate = null;
 
     private boolean network = true;
 
@@ -130,6 +132,9 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
     //系统广播
     public static final String SYS_NET_CONNECTION_STATE_CHANGE = "android.net.conn.CONNECTIVITY_CHANGE";
 
+    //其他
+    private UpdateManager mUpdateManager = UpdateManager.getInstance();
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -166,6 +171,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
         buttonPPT = (Button) findViewById(R.id.button3);
         buttonPlayBack = (Button) findViewById(R.id.button4);
         buttonBattery = (Button) findViewById(R.id.button5);
+        buttonCheckUpdate = (Button) findViewById(R.id.button6);
 
         buttonSOS.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -217,6 +223,15 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                 handler.sendMessage(message3);
             }
         });
+
+        //虽然开机会自动升级 但是这里增加一个按键手动check升级
+        buttonCheckUpdate.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                mUpdateManager.startNetworkUpdate(0);
+            }
+        });
+
         Intent intent = new Intent(this, LocationService.class);
         startService(intent);
     }
