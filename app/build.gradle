@@ -2,14 +2,6 @@ apply plugin: 'com.android.application'
 apply plugin: 'com.google.protobuf'
 
 android {
-    signingConfigs {
-        config {
-            keyAlias 'key0'
-            keyPassword 'shenzhenjimi'
-            storeFile file('./shenzhenjimi.jks')
-            storePassword 'shenzhenjimi'
-        }
-    }
     compileSdkVersion 28
     defaultConfig {
         applicationId "com.example.janus_android_jw"
@@ -20,14 +12,34 @@ android {
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
         multiDexEnabled true
     }
+    signingConfigs {
+        release {
+            storeFile file('..\\outputs\\platform.keystore')
+            storePassword 'android'
+            keyAlias 'platform'
+            keyPassword 'android'
+        }
+
+        debug {
+            storeFile file('..\\outputs\\platform.keystore')
+            storePassword 'android'
+            keyAlias 'platform'
+            keyPassword 'android'
+        }
+    }
     buildTypes {
         debug {
+            println('build debug apk')
+            buildConfigField("String", "buildTime", "\""+new Date().format("yyyy-MM-dd HH:mm:ss")+"\"")
             minifyEnabled false
-            signingConfig signingConfigs.config
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.debug
         }
         release {
+            println('build release apk')
+            buildConfigField("String", "buildTime", "\""+new Date().format("yyyy-MM-dd HH:mm:ss")+"\"")
             minifyEnabled false
-            signingConfig signingConfigs.config
+            signingConfig signingConfigs.release
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
@@ -74,5 +86,9 @@ dependencies {
     compile 'com.koushikdutta.async:androidasync:2.+'
     compile 'com.mcxiaoke.volley:library:1.0.15@aar'
     implementation 'com.squareup.okhttp3:okhttp:3.6.0'
-
+    implementation 'com.android.support:multidex:1.0.1'
+    //okhttp
+    implementation 'com.squareup.okhttp:okhttp:2.7.5'
+    implementation 'com.squareup.okio:okio:1.13.0'
+    api files('libs/otasdk.jar')
 }

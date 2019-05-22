@@ -1,16 +1,22 @@
 package com.example.janus_android_jw;
 
+import android.Manifest;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.media.MediaPlayer;
+import android.net.ConnectivityManager;
 import android.net.Uri;
-import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.speech.tts.TextToSpeech;
+import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
+import android.os.Bundle;
+import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -27,6 +33,7 @@ import com.example.janus_android_jw.signalingcontrol.MyControlCallBack;
 import com.example.janus_android_jw.tool.AppTools;
 import com.example.janus_android_jw.tool.GrpcConnectionManager;
 import com.example.janus_android_jw.tool.NetworkUtil;
+import com.huizhou.jimi.otasdk.update.UpdateManager;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -36,8 +43,6 @@ import java.util.ArrayList;
 import java.util.Locale;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import io.grpc.ManagedChannel;
@@ -60,13 +65,76 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
     private MediaPlayer mediaPlayer;
     private boolean isSenderSOS = false;
 
-    private Button button1 = null;
-    private Button button2 = null;
-    private Button button3 = null;
-    private Button button4 = null;
-    private Button button5 = null;
+    private Thread instantMessageThread;
+
+    private Button buttonSOS = null;
+    private Button buttonSwitchGroup = null;
+    private Button buttonPPT = null;
+    private Button buttonPlayBack = null;
+    private Button buttonBattery = null;
+    private Button buttonCheckUpdate = null;
 
     private boolean network = true;
+
+    //按键实际在设备中没有用到 仅仅是为了在手机APP上模拟相应按键效果 后续可以考虑直接sendMsg给handle去处理
+    public static final String BROADCAST_BUTTON_SOS_PRESS_LONG = "android.intent.action.ext_p1.longpress";
+    public static final String BROADCAST_BUTTON_SOS_PRESS_DOWN = "android.intent.action.ext_p1.down";
+    public static final String BROADCAST_BUTTON_SOS_PRESS_UP = "android.intent.action.ext_p1.up";
+
+    public static final String BROADCAST_BUTTON_SWITCHGROUP_PRESS_LONG = "android.intent.action.ext_p2.longpress";
+    public static final String BROADCAST_BUTTON_SWITCHGROUP_PRESS_DOWN = "android.intent.action.ext_p2.down";
+    public static final String BROADCAST_BUTTON_SWITCHGROUP_PRESS_UP = "android.intent.action.ext_p2.up";
+
+    public static final String BROADCAST_BUTTON_PPT_PRESS_LONG = "android.intent.action.ext_ptt.longpress";
+    public static final String BROADCAST_BUTTON_PPT_PRESS_DOWN = "android.intent.action.ext_ptt.down";
+    public static final String BROADCAST_BUTTON_PPT_PRESS_UP = "android.intent.action.ext_ptt.up";
+
+    public static final String BROADCAST_BUTTON_PLAYBACK_PRESS_LONG = "android.intent.action.ext_p3.longpress";
+    public static final String BROADCAST_BUTTON_PLAYBACK_PRESS_DOWN = "android.intent.action.ext_p3.down";
+    public static final String BROADCAST_BUTTON_PLAYBACK_PRESS_UP = "android.intent.action.ext_p3.up";
+
+    public static final String BROADCAST_BUTTON_BATTERY_PRESS_LONG = "android.intent.action.ext_fun.longpress";
+    public static final String BROADCAST_BUTTON_BATTERY_PRESS_DOWN = "android.intent.action.ext_fun.down";
+    public static final String BROADCAST_BUTTON_BATTERY_PRESS_UP = "android.intent.action.ext_fun.up";
+
+    //功能键消息
+    public static final int MSG_BUTTON_PPT_PRESS_DOWN = 0;
+    public static final int MSG_BUTTON_PPT_PRESS_LONG = 1;
+    public static final int MSG_BUTTON_PPT_PRESS_UP = 2;
+
+    public static final int MSG_BUTTON_SOS_PRESS_DOWN = 3;
+    public static final int MSG_BUTTON_SOS_PRESS_LONG = 4;
+    public static final int MSG_BUTTON_SOS_PRESS_UP = 5;
+
+    public static final int MSG_BUTTON_SWITCHGROUP_PRESS_DOWN = 6;
+    public static final int MSG_BUTTON_SWITCHGROUP_PRESS_LONG = 7;
+    public static final int MSG_BUTTON_SWITCHGROUP_PRESS_UP = 8;
+
+    public static final int MSG_BUTTON_PLAYBACK_PRESS_DOWN = 9;
+    public static final int MSG_BUTTON_PLAYBACK_PRESS_LONG = 10;
+    public static final int MSG_BUTTON_PLAYBACK_PRESS_UP = 11;
+
+    public static final int MSG_BUTTON_BATTERY_PRESS_DOWN = 12;
+    public static final int MSG_BUTTON_BATTERY_PRESS_LONG = 13;
+    public static final int MSG_BUTTON_BATTERY_PRESS_UP = 14;
+
+    //其他消息
+    public static final int MSG_SOS_RECYCLE_PLAYBACK = 301;
+    public static final int MSG_LOW_BATTERY_PROMPT = 302;
+    public static final int MSG_GET_INSTANT_MSG = 303;
+    public static final int MSG_RECCONNECT_GPRC = 304;
+    public static final int MSG_HANDLE_SOS_TASK_BACK = 401;
+
+    //系统消息
+    public static final int MSG_SYS_NET_CONNECTION_STATE_CHANGE = 15;
+    public static final int MSG_JANUS_SERVER_RECONNECT = 100;
+
+    //系统广播
+    public static final String SYS_NET_CONNECTION_STATE_CHANGE = "android.net.conn.CONNECTIVITY_CHANGE";
+
+    //其他
+    private UpdateManager mUpdateManager = UpdateManager.getInstance();
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -98,62 +166,71 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
         janusControl = new JanusControl(this, UserBean.getUserBean().getUserName(), UserBean.getUserBean().getUserId(), UserBean.getUserBean().getDefaultGroupId());
         janusControl.Start(false);
 
-        button1 = (Button) findViewById(R.id.button1);
-        button2 = (Button) findViewById(R.id.button2);
-        button3 = (Button) findViewById(R.id.button3);
-        button4 = (Button) findViewById(R.id.button4);
-        button5 = (Button) findViewById(R.id.button5);
+        buttonSOS = (Button) findViewById(R.id.button1);
+        buttonSwitchGroup = (Button) findViewById(R.id.button2);
+        buttonPPT = (Button) findViewById(R.id.button3);
+        buttonPlayBack = (Button) findViewById(R.id.button4);
+        buttonBattery = (Button) findViewById(R.id.button5);
+        buttonCheckUpdate = (Button) findViewById(R.id.button6);
 
-        button1.setOnClickListener(new View.OnClickListener() {
+        buttonSOS.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                sendBroadcast(new Intent("android.intent.action.ext_p1.longpress"));
-                myMediaPlayer("", R.raw.start);
+                sendBroadcast( new Intent(BROADCAST_BUTTON_SOS_PRESS_LONG));
+                myMediaPlayer("",R.raw.start);
             }
         });
 
-        button2.setOnClickListener(new View.OnClickListener() {
+        buttonSwitchGroup.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                sendBroadcast(new Intent("android.intent.action.ext_p2.down"));
+                sendBroadcast( new Intent(BROADCAST_BUTTON_SWITCHGROUP_PRESS_DOWN));
             }
         });
 
-        button3.setOnTouchListener(new View.OnTouchListener() {
+        buttonPPT.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
                 int action = event.getAction();
                 switch (action) {
                     case MotionEvent.ACTION_DOWN:
-                        sendBroadcast(new Intent("android.intent.action.ext_ptt.down"));
+                        sendBroadcast( new Intent(BROADCAST_BUTTON_PPT_PRESS_DOWN));
                         break;
                     case MotionEvent.ACTION_MOVE:
 
                         break;
                     case MotionEvent.ACTION_UP:
-                        sendBroadcast(new Intent("android.intent.action.ext_ptt.up"));
+                        sendBroadcast( new Intent(BROADCAST_BUTTON_PPT_PRESS_UP));
                         break;
                 }
                 return false;
             }
         });
 
-        button4.setOnClickListener(new View.OnClickListener() {
+        buttonPlayBack.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                sendBroadcast(new Intent("android.intent.action.ext_p3.down"));
+                sendBroadcast( new Intent(BROADCAST_BUTTON_PLAYBACK_PRESS_DOWN));
             }
         });
 
-        button5.setOnClickListener(new View.OnClickListener() {
+        buttonBattery.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 Message message3 = Message.obtain();
-                message3.what = 3;
+                message3.what = MSG_BUTTON_SOS_PRESS_DOWN;
                 handler.sendMessage(message3);
             }
         });
 
+//虽然开机会自动升级 但是这里增加一个按键手动check升级
+        buttonCheckUpdate.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                mUpdateManager.startNetworkUpdate(0);
+            }
+        });
+		
 //       Thread thread12 = new Thread(){
 //           @Override
 //           public void run() {
@@ -176,27 +253,27 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
         if (myBroadcastReceiver == null) {
             myBroadcastReceiver = new MyBroadcastReceiver();
             IntentFilter intentFilter = new IntentFilter();
-            intentFilter.addAction("android.intent.action.ext_ptt.down");
-            intentFilter.addAction("android.intent.action.ext_ptt.longpress");
-            intentFilter.addAction("android.intent.action.ext_ptt.up");
+            intentFilter.addAction(BROADCAST_BUTTON_PPT_PRESS_DOWN);
+            intentFilter.addAction(BROADCAST_BUTTON_PPT_PRESS_LONG);
+            intentFilter.addAction(BROADCAST_BUTTON_PPT_PRESS_UP);
 
-            intentFilter.addAction("android.intent.action.ext_p1.down");
-            intentFilter.addAction("android.intent.action.ext_p1.longpress");
-            intentFilter.addAction("android.intent.action.ext_p1.up");
+            intentFilter.addAction(BROADCAST_BUTTON_SOS_PRESS_DOWN);
+            intentFilter.addAction(BROADCAST_BUTTON_SOS_PRESS_LONG);
+            intentFilter.addAction(BROADCAST_BUTTON_SOS_PRESS_UP);
 
-            intentFilter.addAction("android.intent.action.ext_p2.down");
-            intentFilter.addAction("android.intent.action.ext_p2.longpress");
-            intentFilter.addAction("android.intent.action.ext_p2.up");
+            intentFilter.addAction(BROADCAST_BUTTON_SWITCHGROUP_PRESS_DOWN);
+            intentFilter.addAction(BROADCAST_BUTTON_SWITCHGROUP_PRESS_LONG);
+            intentFilter.addAction(BROADCAST_BUTTON_SWITCHGROUP_PRESS_UP);
 
-            intentFilter.addAction("android.intent.action.ext_p3.down");
-            intentFilter.addAction("android.intent.action.ext_p3.longpress");
-            intentFilter.addAction("android.intent.action.ext_p3.up");
+            intentFilter.addAction(BROADCAST_BUTTON_PLAYBACK_PRESS_DOWN);
+            intentFilter.addAction(BROADCAST_BUTTON_PLAYBACK_PRESS_LONG);
+            intentFilter.addAction(BROADCAST_BUTTON_PLAYBACK_PRESS_UP);
 
-            intentFilter.addAction("android.intent.action.ext_fun.down");
-            intentFilter.addAction("android.intent.action.ext_fun.longpress");
-            intentFilter.addAction("android.intent.action.ext_fun.up");
+            intentFilter.addAction(BROADCAST_BUTTON_BATTERY_PRESS_DOWN);
+            intentFilter.addAction(BROADCAST_BUTTON_BATTERY_PRESS_LONG);
+            intentFilter.addAction(BROADCAST_BUTTON_BATTERY_PRESS_UP);
 
-            intentFilter.addAction("android.net.conn.CONNECTIVITY_CHANGE");
+            intentFilter.addAction(SYS_NET_CONNECTION_STATE_CHANGE);
             registerReceiver(myBroadcastReceiver, intentFilter);
 
             mBatteryReceiver = new BatteryReceiver(handler);
@@ -218,7 +295,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                 Log.e("-janus------", "-----100的错误-----" + msg);
                 if (msg.indexOf("Exception: null") == -1) {
                     Message message100 = Message.obtain();
-                    message100.what = 100;
+                    message100.what = MSG_JANUS_SERVER_RECONNECT;
                     handler.sendMessage(message100);
                 }
                 break;
@@ -381,70 +458,70 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
         @Override
         public void onReceive(Context context, Intent intent) {
             Log.e("MainActivity", "MainActivity intent=" + intent.getAction());
-            if ("android.intent.action.ext_ptt.down".equals(intent.getAction())) {
+            if (BROADCAST_BUTTON_PPT_PRESS_DOWN.equals(intent.getAction())) {
                 Message message0 = Message.obtain();
-                message0.what = 0;
+                message0.what = MSG_BUTTON_PPT_PRESS_DOWN;
                 handler.sendMessage(message0);
-            } else if ("android.intent.action.ext_ptt.longpress".equals(intent.getAction())) {
+            } else if (BROADCAST_BUTTON_PPT_PRESS_LONG.equals(intent.getAction())) {
                 Message message1 = Message.obtain();
-                message1.what = 1;
+                message1.what = MSG_BUTTON_PPT_PRESS_LONG;
                 handler.sendMessage(message1);
-            } else if ("android.intent.action.ext_ptt.up".equals(intent.getAction())) {
+            } else if (BROADCAST_BUTTON_PPT_PRESS_UP.equals(intent.getAction())) {
                 Message message2 = Message.obtain();
-                message2.what = 2;
+                message2.what = MSG_BUTTON_PPT_PRESS_UP;
                 handler.sendMessage(message2);
-            } else if ("android.intent.action.ext_p1.down".equals(intent.getAction())) {
+            } else if (BROADCAST_BUTTON_SOS_PRESS_DOWN.equals(intent.getAction())) {
                 Message message3 = Message.obtain();
-                message3.what = 3;
+                message3.what = MSG_BUTTON_SOS_PRESS_DOWN;
                 handler.sendMessage(message3);
-            } else if ("android.intent.action.ext_p1.longpress".equals(intent.getAction())) {
+            } else if (BROADCAST_BUTTON_SOS_PRESS_LONG.equals(intent.getAction())) {
                 Message message4 = Message.obtain();
-                message4.what = 4;
+                message4.what = MSG_BUTTON_SOS_PRESS_LONG;
                 handler.sendMessage(message4);
-            } else if ("android.intent.action.ext_p1.up".equals(intent.getAction())) {
+            } else if (BROADCAST_BUTTON_SOS_PRESS_UP.equals(intent.getAction())) {
                 Message message5 = Message.obtain();
-                message5.what = 5;
+                message5.what = MSG_BUTTON_SOS_PRESS_UP;
                 handler.sendMessage(message5);
-            } else if ("android.intent.action.ext_p2.down".equals(intent.getAction())) {
+            } else if (BROADCAST_BUTTON_SWITCHGROUP_PRESS_DOWN.equals(intent.getAction())) {
                 Message message6 = Message.obtain();
-                message6.what = 6;
+                message6.what = MSG_BUTTON_SWITCHGROUP_PRESS_DOWN;
                 handler.sendMessage(message6);
-            } else if ("android.intent.action.ext_p2.longpress".equals(intent.getAction())) {
+            } else if (BROADCAST_BUTTON_SWITCHGROUP_PRESS_LONG.equals(intent.getAction())) {
                 Message message7 = Message.obtain();
-                message7.what = 7;
+                message7.what = MSG_BUTTON_SWITCHGROUP_PRESS_LONG;
                 handler.sendMessage(message7);
-            } else if ("android.intent.action.ext_p2.up".equals(intent.getAction())) {
+            } else if (BROADCAST_BUTTON_SWITCHGROUP_PRESS_UP.equals(intent.getAction())) {
                 Message message8 = Message.obtain();
-                message8.what = 8;
+                message8.what = MSG_BUTTON_SWITCHGROUP_PRESS_UP;
                 handler.sendMessage(message8);
-            } else if ("android.intent.action.ext_p3.down".equals(intent.getAction())) {
+            } else if (BROADCAST_BUTTON_PLAYBACK_PRESS_DOWN.equals(intent.getAction())) {
                 Message message9 = Message.obtain();
-                message9.what = 9;
+                message9.what = MSG_BUTTON_PLAYBACK_PRESS_DOWN;
                 handler.sendMessage(message9);
-            } else if ("android.intent.action.ext_p3.longpress".equals(intent.getAction())) {
+            } else if (BROADCAST_BUTTON_PLAYBACK_PRESS_LONG.equals(intent.getAction())) {
                 Message message10 = Message.obtain();
-                message10.what = 10;
+                message10.what = MSG_BUTTON_PLAYBACK_PRESS_LONG;
                 handler.sendMessage(message10);
-            } else if ("android.intent.action.ext_p3.up".equals(intent.getAction())) {
+            } else if (BROADCAST_BUTTON_PLAYBACK_PRESS_UP.equals(intent.getAction())) {
                 Message message11 = Message.obtain();
-                message11.what = 11;
+                message11.what = MSG_BUTTON_PLAYBACK_PRESS_UP;
                 handler.sendMessage(message11);
-            } else if ("android.intent.action.ext_fun.down".equals(intent.getAction())) {
+            } else if (BROADCAST_BUTTON_BATTERY_PRESS_DOWN.equals(intent.getAction())) {
                 Message message12 = Message.obtain();
-                message12.what = 12;
+                message12.what = MSG_BUTTON_BATTERY_PRESS_DOWN;
                 handler.sendMessage(message12);
-            } else if ("android.intent.action.ext_fun.longpress".equals(intent.getAction())) {
+            } else if (BROADCAST_BUTTON_BATTERY_PRESS_LONG.equals(intent.getAction())) {
                 Message message13 = Message.obtain();
-                message13.what = 13;
+                message13.what = MSG_BUTTON_BATTERY_PRESS_LONG;
                 handler.sendMessage(message13);
-            } else if ("android.intent.action.ext_fun.up".equals(intent.getAction())) {
+            } else if (BROADCAST_BUTTON_BATTERY_PRESS_UP.equals(intent.getAction())) {
                 Message message14 = Message.obtain();
-                message14.what = 14;
+                message14.what = MSG_BUTTON_BATTERY_PRESS_UP;
                 handler.sendMessage(message14);
-            } else if ("android.net.conn.CONNECTIVITY_CHANGE".equals(intent.getAction())) {
+            } else if (SYS_NET_CONNECTION_STATE_CHANGE.equals(intent.getAction())) {
                 Log.e("-network------", intent.getAction() + "===" + NetworkUtil.getNetWorkStates(MainActivity.this));
                 Message message15 = Message.obtain();
-                message15.what = 15;
+                message15.what = MSG_SYS_NET_CONNECTION_STATE_CHANGE;
                 handler.sendMessage(message15);
             }
         }
@@ -453,7 +530,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
     private Handler handler = new Handler() {
         public void handleMessage(android.os.Message msg) {
             switch (msg.what) {
-                case 0:
+                case MSG_BUTTON_PPT_PRESS_DOWN:
                     //ptt down
                     if(network){
                         JanusControl.setAddAudioTrack();
@@ -462,11 +539,11 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                         myToast(R.string.network_unavailable, null);
                     }
                     break;
-                case 1:
+                case MSG_BUTTON_PPT_PRESS_LONG:
                     //ptt lang
 
                     break;
-                case 2:
+                case MSG_BUTTON_PPT_PRESS_UP:
                     //ptt up
                     //JanusControl.sendConfigure(MainActivity.this,true);
                     if(network){
@@ -474,28 +551,28 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                         JanusControl.sendUnTalk(MainActivity.this, UserBean.getUserBean().getDefaultGroupId());
                     }
                     break;
-                case 3:
+                case MSG_BUTTON_SOS_PRESS_DOWN:
                     //p1 down
                     if(network) {
                         if (isSenderSOS) {
                             cancelSOS();
                             isSenderSOS = false;
                         }
-                        handler.removeMessages(301);
+                        handler.removeMessages(MSG_SOS_RECYCLE_PLAYBACK);
                     }else{
                         myToast(R.string.network_unavailable, null);
                     }
                     break;
-                case 4:
+                case MSG_BUTTON_SOS_PRESS_LONG:
                     //p1 lang
                     handleSOSTaskBack(SEND_SOS_TYPE);
                     isSenderSOS = true;
                     break;
-                case 5:
+                case MSG_BUTTON_SOS_PRESS_UP:
                     //p1 up
 
                     break;
-                case 6:
+                case MSG_BUTTON_SWITCHGROUP_PRESS_DOWN:
                     //p2 down
                     if(network) {
                         if (UserBean.getUserBean().getGroupBeanArrayList().size() > 1) {
@@ -503,7 +580,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                                 cancelSOS();
                                 isSenderSOS = false;
                             }
-                            handler.removeMessages(301);
+                            handler.removeMessages(MSG_SOS_RECYCLE_PLAYBACK);
                             int nextPosition = position;
                             if (nextPosition == UserBean.getUserBean().getGroupBeanArrayList().size() - 1) {
                                 nextPosition = 0;
@@ -519,15 +596,15 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                         myToast(R.string.network_unavailable, null);
                     }
                     break;
-                case 7:
+                case MSG_BUTTON_SWITCHGROUP_PRESS_LONG:
                     //p2 lang
 
                     break;
-                case 8:
+                case MSG_BUTTON_SWITCHGROUP_PRESS_UP:
                     //p2 up
 
                     break;
-                case 9:
+                case MSG_BUTTON_PLAYBACK_PRESS_DOWN:
                     //p3 down
                     if(network) {
                         playBack();
@@ -535,27 +612,27 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                         myToast(R.string.network_unavailable, null);
                     }
                     break;
-                case 10:
+                case MSG_BUTTON_PLAYBACK_PRESS_LONG:
                     //p3 lang
 
                     break;
-                case 11:
+                case MSG_BUTTON_PLAYBACK_PRESS_UP:
                     //p3 up
 
                     break;
-                case 12:
+                case MSG_BUTTON_BATTERY_PRESS_DOWN:
                     String batteryMsg = "current battery is " + BatteryReceiver.mBatteryPower + "%";
                     myToast(0, batteryMsg);
                     break;
-                case 13:
+                case MSG_BUTTON_BATTERY_PRESS_LONG:
                     //p4 lang
 
                     break;
-                case 14:
+                case MSG_BUTTON_BATTERY_PRESS_UP:
                     //p4 up
 
                     break;
-                case 15:
+                case MSG_SYS_NET_CONNECTION_STATE_CHANGE:
                     //网络状态
                     int netWorkStates = NetworkUtil.getNetWorkStates(MainActivity.this);
                     switch (netWorkStates) {
@@ -581,7 +658,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                             break;
                     }
                     break;
-                case 100:
+                case MSG_JANUS_SERVER_RECONNECT:
                     //连接错误
                     myToast(R.string.websocket_connection_fail, null);
                     if (network) {
@@ -646,15 +723,15 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                     //someone is talking
                     myToast(R.string.someone_is_talking, null);
                     break;
-                case 301:
+                case MSG_SOS_RECYCLE_PLAYBACK:
                     String sosName = (String) msg.obj;
                     receiverSOS(sosName);
                     break;
-                case 302:
+                case MSG_LOW_BATTERY_PROMPT:
                     String lowBattery = "current battery is less than 20%";
                     myToast(R.string.app_name, lowBattery);
                     break;
-                case 401:
+                case MSG_HANDLE_SOS_TASK_BACK:
                     sendSOS((TalkCloudApp.ImMsgRespData) msg.obj);
                     break;
             }
@@ -744,7 +821,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                                     playBackPosition = 0;
                                     if (value.getImMsgData().getMsgType() == SEND_SOS_TYPE) {
                                         Message message301 = Message.obtain();
-                                        message301.what = 301;
+                                        message301.what = MSG_SOS_RECYCLE_PLAYBACK;
                                         message301.obj = value.getImMsgData().getSenderName();
                                         handler.sendMessage(message301);
                                     } else if (value.getImMsgData().getMsgType() == CANCEL_SOS_TYPE) {
@@ -913,9 +990,9 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
 
     private void receiverSOS(String name) {
         myToast(0, name + " sos");
-        handler.removeMessages(301);
+        handler.removeMessages(MSG_SOS_RECYCLE_PLAYBACK);
         Message message = Message.obtain();
-        message.what = 301;
+        message.what = MSG_SOS_RECYCLE_PLAYBACK;
         message.obj = name;
         handler.sendMessageDelayed(message, 5 * 1000);
     }
@@ -957,7 +1034,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                     TalkCloudApp.ImMsgRespData lockGroupIdResp = GrpcConnectionManager.getInstance().getBlockingStub().imMessagePublish(data);
                     Message msg = Message.obtain();
                     msg.obj = lockGroupIdResp;
-                    msg.what = 401;
+                    msg.what = MSG_HANDLE_SOS_TASK_BACK;
                     handler.sendMessage(msg);
                 }
             });

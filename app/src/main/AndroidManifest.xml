@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.janus_android_jw">
+    xmlns:tools="http://schemas.android.com/tools"
+    package="com.example.janus_android_jw"
+    android:sharedUserId="android.uid.system">
 
     <application
+        android:name=".BaseApplication"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -10,24 +13,44 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
         <activity
-            android:name=".MainActivity"
-            android:launchMode="singleTask">
-
-        </activity>
-
-        <receiver android:name=".receiver.BootBroadcastReceiver" >
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-            </intent-filter>
-        </receiver>
-
-        <activity
             android:name=".LaunchActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".MainActivity"
+            android:launchMode="singleTask">
+
+        </activity>
+
+        <receiver android:name=".ota.BootReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </receiver>
+        <receiver android:name=".ota.AppInstallReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.PACKAGE_REPLACED" />
+
+                <data android:scheme="package" />
+            </intent-filter>
+        </receiver>
+
+        <service android:name="com.huizhou.jimi.otasdk.UpdateService" />
+
+        <meta-data
+            android:name="JM_API_TOKEN"
+            android:value="a56a1b44d335eba3e15ebc8c8a9e1807">
+        </meta-data>
+
+        <meta-data
+            android:name="JM_APP_KEY"
+            android:value="f4834eaecba17a3304bafa20d9fcb299">
+        </meta-data>
 
         <service
             android:name=".gps.LocationService"
@@ -55,5 +78,7 @@
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-
+    <uses-permission
+        android:name="android.permission.INSTALL_PACKAGES"
+        tools:ignore="ProtectedPermissions" />
 </manifest>
