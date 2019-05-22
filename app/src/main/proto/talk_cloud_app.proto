@@ -3,7 +3,7 @@ syntax = "proto3";
 package talk_cloud;
 
 import "talk_cloud_model.proto";
-
+import "talk_cloud_location.proto";
 
 service TalkCloud {
     // app注册普通用户
@@ -38,7 +38,7 @@ service TalkCloud {
     rpc AddFriend (FriendNewReq) returns (FriendNewRsp) {
     }
 
-    // App用户删除好友
+    // App用户删除好友  /***暂时用不到***/
     rpc DelFriend (FriendDelReq) returns (FriendDelRsp) {
     }
 
@@ -86,21 +86,21 @@ service TalkCloud {
     rpc GetGroupInfo (GetGroupInfoReq) returns (GetGroupInfoResp) {
     };
 
+    // 暂时借用im简单调用去推送sos报警
+    rpc ImSosPublish (ReportDataReq) returns (ImMsgRespData) {
+    }
+
+    // app获取apk
+    rpc GetApkInfo (apkInfoReq) returns (apkInfoResp) {
+    }
 }
 
 /*************** Register ***************/
-// 头部信息
-message Head {
-    string version = 1; // 主版本号
-    string sub_version = 2; // 子版本号
-    int32 timestamp = 3; // 时间戳
-}
 
 // App注册用户请求
 message AppRegReq {
-    Head head = 1;
-    string name = 2;
-    string password = 3;
+    string name = 1;
+    string password = 2;
 }
 
 // App注册用户响应
@@ -123,9 +123,8 @@ message DeviceRegRsp {
 
 // 登录请求
 message LoginReq {
-    Head head = 1;
-    string name = 2;
-    string passwd = 3;
+    string name = 1;
+    string passwd = 2;
 }
 
 // 登录返回的数据（群组列表，好友列表等）
@@ -153,7 +152,7 @@ message ImMsgReqData {
     // 资源文件路径，app端发送文字信息，就把文字内容放在这里
     string ResourcePath = 5;
 
-    // im消息类型 	1 普通文本   2 图片  3  音频文件  4 视频文件  5 PDF文件
+    // im消息类型 	1 普通文本   2 图片  3  音频文件  4 视频文件  5 PDF文件 // 无屏幕对讲机使用了6作为sos 7作为cancel sos
     int32 MsgType = 6;
 
     // 接收者名字
@@ -162,6 +161,7 @@ message ImMsgReqData {
     // 消息发送时间
     string SendTime = 8;
 
+    //  /***暂时用不到***/
     string msgCode = 9;
 }
 
@@ -173,8 +173,7 @@ message ImMsgRespData {
 
 // 退出请求
 message LogoutReq {
-    Head head = 1;
-    string name = 2;
+    string name = 1;
 }
 
 message LogoutRsp {
@@ -195,7 +194,7 @@ message StreamRequest {
     // 用户id
     int32 uid = 1;
 
-    // 1  初次登录返回的数据。比如用户列表，群组列表，该用户的个人信息
+    // 1  初次登录返回的数据。比如用户列表，群组列表，该用户的个人信息   /***数值为1这个消息暂时用不到***/
     // 2  用户离线时的IM数据
     // 3  APP和web通过httpClient上传的文件信息、在线时通信的im数据
     // 4  用户登录后，每隔interval秒向stream发送一个消息，测试能不能连通，不能连通就认为该用户下线
@@ -205,20 +204,21 @@ message StreamRequest {
     string name = 3;
     string passwd = 4;
 
-    // 这个也暂时用不到，文件上传不走这里，文件上传是通过http client
+    // 用不到，文件上传不走这里，文件上传是通过http client
     UploadFileData FileDataReq = 5;
 
     // app发送文字类型im数据的时候使用
     ImMsgReqData imMsg = 6;
-
 }
 
+// 用不到，文件上传不走这里，文件上传是通过http client
 message UploadFileData {
     int32 id = 1; // 谁发的，是单独，还是发给群组
     int32 sendType = 2;
     int32 ReceiverId = 3; // 接受者的id，群组就是群组id
 }
 
+// 这个也暂时用不到，app发送im文字信息不走这里，app不方便使用双向流，于是im的文字信息也没有使用stream模式的rpc
 message ImReceiver {
     int32 type = 1; // 1 是发送给群组， 2是发送给个人
     GroupInfo groupInfo = 2;
@@ -232,7 +232,7 @@ message StreamResponse {
     // 1  初次登录返回的数据。比如用户列表，群组列表，该用户的个人信息
     // 2  用户离线时的IM数据
     // 3  APP和web通过httpClient上传的文件信息、在线时通信的im数据
-    // 4  用户登录后，每隔interval秒向stream发送一个消息，测试能不能连通，不能连通就认为该用户下线
+    // 4  用户登录后，每隔interval秒向stream发送一个消息，发送内容为keepalive，不能连通就认为该用户下线
     int32 DataType = 2;
 
     // 初次登录类型的请求消息，应该返回的数据，但是目前login还是保持原来的接口，这个就暂时用不到
@@ -244,11 +244,11 @@ message StreamResponse {
     // im离线消息
     OfflineImMsgResp offlineImMsgResp = 5;
 
-    // 登录建立这个stream流之后，会每隔interval秒（目前暂定5s）收到这样一条消息，可以忽略
+    // TODO 收到app client来的心跳消息之后是否返回一个消息
     KeepAlive keepAlive = 6;
 
-    // 用户离线，推送给其他在一个组的在线用户更新状态
-    LogoutNotify logoutNotify = 7;
+    // 用户离线，推送给其他在一个组的在线用户更新状态 // SOS
+    LoginOrLogoutNotify Notify = 7;
 
     // 通知的人数
     int32 notifyTotal = 8;
@@ -257,40 +257,63 @@ message StreamResponse {
     Result res = 9;
 }
 
-message LogoutNotify {
-//    Member userInfo = 1;
-    repeated GroupInfo group_list = 1;
+// 用户上线提醒和他有关的消息 用户下线提醒和他有关的消息
+message LoginOrLogoutNotify {
+    // 用户自己的信息
+    UserRecord userInfo = 1;
+
+    // 用户自己的定位信息
+    GPS userLocation = 2;
+
+    // 和用户相关的群组的信息（包含群里有多少人，哪些人在线等）
+    repeated GroupInfo group_list = 3;
 }
 
+// 登录之后返回的im离线消息
 message OfflineImMsgResp {
+    // 单聊的离线消息
     repeated OfflineImMsg offlineSingleImMsgs = 1;
+
+    // 群聊的离线消息
     repeated OfflineImMsg offlineGroupImMsgs = 2;
+
+    // 群聊的ptt离线消息
+    repeated OfflineImMsg offlineGroupPttImMsgs = 3;
 }
+
+// 离线消息model
 message OfflineImMsg {
     int32 SenderId = 1;
     int32 GroupId = 2;
-    string Name =3;
-    int32 MsgReceiverType  = 4;
+    string Name = 3;
+    int32 MsgReceiverType = 4;
     repeated ImMsgReqData imMsgData = 5;
 }
 
+// 用不到，没有用这个stream中的返回消息
 message FirstLoginData {
     Member userInfo = 1;
     repeated FriendRecord friend_list = 2;
     repeated GroupInfo group_list = 3;
 }
 
+// 客户端往stream发送的心跳消息 目前也不用，直接在最外层的消息体里的消息类型声明是4就可以
 message KeepAlive {
     int32 uid = 1;
     int32 SYN = 2;
 }
 
 /************** User_Friend *************/
+// 新加好友
 message FriendNewReq {
+    // 账户id
     int32 uid = 1;
+
+    // 要加的好友id
     int32 fuid = 2;
 }
 
+// 添加好友的返回
 message FriendNewRsp {
     Result res = 1;
 }
@@ -321,18 +344,20 @@ message FriendsRsp {
     Result res = 3;
 }
 
+// 模糊搜索好友
 message UserSearchReq {
     int32 uid = 1;
     string target = 2;
 }
 
+// 用户信息model 和talk_cloud_model.proto中的member message重复了，算了，暂时这么用
 message UserRecord {
     int32 uid = 1;
     string imei = 2;
     string name = 3;
     int32 online = 4;
     int32 LockGroupId = 5;
-    int32 user_type = 6; // 用户类型
+    int32 user_type = 6; // 用户类型， 管理员用户，app用户
     int32 grp_role = 7; // 2 群主  1 普通群成员
     bool isFriend = 8; // 是否是好友
 }
@@ -343,7 +368,7 @@ message UserSearchRsp {
 
 }
 /**************** Group *****************/
-
+// 创建群组
 message CreateGroupReq {
     //    repeated int32 deviceIds = 1;
     string deviceIds = 1;
@@ -358,6 +383,7 @@ message CreateGroupResp {
     Result res = 2;
 }
 
+// 加入某个群组
 message GrpUserAddReq {
     int32 uid = 1;
     int32 gid = 2;
@@ -368,6 +394,7 @@ message GrpUserAddRsp {
     Result res = 1;
 }
 
+// 移除某个组成员
 message GrpUserDelReq {
     int32 uid = 1;
     int32 gid = 2;
@@ -378,6 +405,7 @@ message GrpUserDelRsp {
     Result res = 1;
 }
 
+// 退出某个组  /***暂时没有用到***/
 message UserExitReq {
     int32 uid = 1;
     int32 gid = 2;
@@ -387,6 +415,7 @@ message UserExitRsp {
     Result res = 1;
 }
 
+// 移除某个组 /***暂时也没有用到***/
 message GroupDelReq {
     int32 uid = 1;
     int32 role_type = 2;
@@ -397,6 +426,7 @@ message GroupDelRsp {
     Result res = 1;
 }
 
+// 获取群组列表
 message GrpListReq {
     int32 uid = 1;
 }
@@ -404,7 +434,7 @@ message GrpListReq {
 message GroupInfo {
     int32 gid = 1;
     string group_name = 2;
-    int32 group_manager = 3;
+    int32 group_manager = 3; // 群管理员id
     repeated UserRecord usr_list = 4; // 群里的成员
     bool isExist = 5; // 该用户是否默认在这个组
 }
@@ -432,6 +462,7 @@ message InviteUserResp {
     Result res = 2;
 }
 
+// App单独获取某个群组信息以及群成员等信息
 message GetGroupInfoReq {
     int32 gid = 1;
     int32 uid = 2;
@@ -440,4 +471,16 @@ message GetGroupInfoReq {
 message GetGroupInfoResp {
     GroupInfo groupInfo = 1;
     Result res = 2;
+}
+
+// apk信息获取req
+message apkInfoReq {
+    int32 uid = 2;
+}
+
+// apk信息获取返回
+message apkInfoResp {
+    string apkVersion = 1;
+    string apkPath = 2;
+    Result res = 3;
 }

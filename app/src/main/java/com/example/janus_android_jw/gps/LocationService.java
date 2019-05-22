@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.Message;
 import android.support.annotation.Nullable;
 import android.util.Log;
@@ -36,6 +37,7 @@ public class LocationService extends Service {
     private DeviceControll mDeviceControll;
     private BluetoothControll mBluetoothControll;
     private final static long LOCATION_SEND_TIME = 5*60 * 1000;//间隔5min发送一次
+    //private final static long LOCATION_SEND_TIME = 10* 1000;//间隔5min发送一次
     private Handler mHandler = new Handler() {
         @Override
         public void handleMessage(Message msg) {
@@ -45,13 +47,14 @@ public class LocationService extends Service {
                     Log.e("---janus---","-----开始定位-22-----");
                     DeviceInfo deviceInfo = mDeviceControll.getDeviceDetail(LocationService.this);
                     GPSInfo gpsInfo = mGPSControll.getCurrentLocationInfo();
-                    WifiData wifiData = mWifiControll.getWifiData();
-                    BaseStationInfo bsInfo = mTelephonyControll.getGSMCellLocationInfo();
-                    BluetoothInfo btInfo = mBluetoothControll.getBluetoothStrength();
+                    //WifiData wifiData = mWifiControll.getWifiData();
+                    //BaseStationInfo bsInfo = mTelephonyControll.getGSMCellLocationInfo();
+                    //BluetoothInfo btInfo = mBluetoothControll.getBluetoothStrength();
                     Log.e("location","LocationService gpsinfo="+gpsInfo);
                     //gps数据为空时，不上传数据
                     if(gpsInfo!=null){
-                        new GrpcLocationTask().execute(getLocationData(deviceInfo,gpsInfo,wifiData,bsInfo,btInfo));
+                        //new GrpcLocationTask().execute(getLocationData(deviceInfo,gpsInfo,wifiData,bsInfo,btInfo));
+                        new GrpcLocationTask().execute(getLocationData(deviceInfo,gpsInfo));
                     }
                     mHandler.sendEmptyMessageDelayed(1, LOCATION_SEND_TIME);
                     break;
@@ -68,10 +71,6 @@ public class LocationService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        init();
-        Log.e("---janus---","-----开始定位-11----");
-        mHandler.sendEmptyMessageDelayed(1,60*1000);
-        //Toast.makeText(this, "start locationservice", Toast.LENGTH_LONG).show();
     }
 
     private void init(){
@@ -79,24 +78,26 @@ public class LocationService extends Service {
             mGPSControll = new GPSControll(this);
             mGPSControll.startLocation();
         }
-        if (mWifiControll == null) {
-            mWifiControll = new WifiControll(this);
-        }
-        if (mTelephonyControll == null) {
-            mTelephonyControll = new TelephonyControll(this);
-        }
+//        if (mWifiControll == null) {
+//            mWifiControll = new WifiControll(this);
+//        }
+//        if (mTelephonyControll == null) {
+//            mTelephonyControll = new TelephonyControll(this);
+//        }
         if(mDeviceControll == null){
             mDeviceControll = new DeviceControll(this);
         }
-        if(mBluetoothControll == null){
-            mBluetoothControll = new BluetoothControll(this);
-            mBluetoothControll.scanBluetooth();
-        }
+//        if(mBluetoothControll == null){
+//            mBluetoothControll = new BluetoothControll(this);
+//            mBluetoothControll.scanBluetooth();
+//        }
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-
+        Log.e("---janus---","-----开始定位-11----");
+        init();
+        mHandler.sendEmptyMessageDelayed(1,LOCATION_SEND_TIME);
         return super.onStartCommand(intent, flags, startId);
     }
 
@@ -107,16 +108,28 @@ public class LocationService extends Service {
             mBluetoothControll.close();
     }
 
-    private HashMap<String, Object> getLocationData(DeviceInfo dInfo, GPSInfo gpsInfo, WifiData wifiInfo, BaseStationInfo bsInfo, BluetoothInfo btInfo) {
+//    private HashMap<String, Object> getLocationData(DeviceInfo dInfo, GPSInfo gpsInfo, WifiData wifiInfo, BaseStationInfo bsInfo, BluetoothInfo btInfo) {
+//        HashMap<String, Object> map = new HashMap<String, Object>();
+//        Device device = Device.newBuilder().setId(UserBean.getUserBean().getUserId()).setBattery(dInfo.getBattery()).setDeviceType(dInfo.getType()).build();
+//        GPS gps = GPS.newBuilder().setLocalTime(gpsInfo.getTime()).setLatitude(gpsInfo.getLatitude()).setLongitude(gpsInfo.getLongitude()).setSpeed(gpsInfo.getSpeed())
+//                .setCourse(gpsInfo.getBearing()).build();
+//        BaseStation bStation = BaseStation.newBuilder().setCountry(bsInfo.getMcc()).setOperator(bsInfo.getMnc()).setCid(bsInfo.getCid()).setLac(bsInfo.getLac())
+//                .setFirstBs(bsInfo.getFirstBs()).setSecondBs(bsInfo.getSecondBs()).setThirdBs(bsInfo.getThirdBs()).build();
+//        Wifi wifi = Wifi.newBuilder().setFirstWifi(wifiInfo.getFirstWifi()).setSecondWifi(wifiInfo.getSecondWifi()).setThirdWifi(wifiInfo.getThirdWifi()).build();
+//        BlueTooth blueTooth = BlueTooth.newBuilder().setFirstBt(btInfo.getFirstBt()).setSecondBt(btInfo.getSecondBt()).setThirdBt(btInfo.getThirdBt()).build();
+//        Location location = Location.newBuilder().setGpsInfo(gps).setBSInfo(bStation).setWifiInfo(wifi).setBtInfo(blueTooth).build();
+//        map.put("imei",dInfo.getImei());
+//        map.put("device",device);
+//        map.put("location",location);
+//        return map;
+//    }
+
+    private HashMap<String, Object> getLocationData(DeviceInfo dInfo, GPSInfo gpsInfo) {
         HashMap<String, Object> map = new HashMap<String, Object>();
         Device device = Device.newBuilder().setId(UserBean.getUserBean().getUserId()).setBattery(dInfo.getBattery()).setDeviceType(dInfo.getType()).build();
         GPS gps = GPS.newBuilder().setLocalTime(gpsInfo.getTime()).setLatitude(gpsInfo.getLatitude()).setLongitude(gpsInfo.getLongitude()).setSpeed(gpsInfo.getSpeed())
                 .setCourse(gpsInfo.getBearing()).build();
-        BaseStation bStation = BaseStation.newBuilder().setCountry(bsInfo.getMcc()).setOperator(bsInfo.getMnc()).setCid(bsInfo.getCid()).setLac(bsInfo.getLac())
-                .setFirstBs(bsInfo.getFirstBs()).setSecondBs(bsInfo.getSecondBs()).setThirdBs(bsInfo.getThirdBs()).build();
-        Wifi wifi = Wifi.newBuilder().setFirstWifi(wifiInfo.getFirstWifi()).setSecondWifi(wifiInfo.getSecondWifi()).setThirdWifi(wifiInfo.getThirdWifi()).build();
-        BlueTooth blueTooth = BlueTooth.newBuilder().setFirstBt(btInfo.getFirstBt()).setSecondBt(btInfo.getSecondBt()).setThirdBt(btInfo.getThirdBt()).build();
-        Location location = Location.newBuilder().setGpsInfo(gps).setBSInfo(bStation).setWifiInfo(wifi).setBtInfo(blueTooth).build();
+        Location location = Location.newBuilder().setGpsInfo(gps).setBSInfo(BaseStation.newBuilder().build()).setBtInfo(BlueTooth.newBuilder().build()).setWifiInfo(Wifi.newBuilder().build()).build();
         map.put("imei",dInfo.getImei());
         map.put("device",device);
         map.put("location",location);

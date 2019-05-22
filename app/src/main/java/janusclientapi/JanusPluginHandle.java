@@ -204,6 +204,7 @@ public class JanusPluginHandle {
             if(stream != null && audioTrack != null){
                 Log.e("--janus--client--audio","------add----------");
                 stream.addTrack(audioTrack);
+                //audioTrack.setEnabled(true);
             }
         });
     }
@@ -213,6 +214,7 @@ public class JanusPluginHandle {
             if(stream != null && audioTrack != null) {
                 Log.e("--janus--client--audio", "------remove----------");
                 stream.removeTrack(audioTrack);
+                //audioTrack.setEnabled(false);
             }
         });
     }
@@ -634,19 +636,7 @@ public class JanusPluginHandle {
         @Override
         public void onIceCandidate(IceCandidate candidate) {
             if(trickle){
-                Thread thread = new Thread(){
-                    @Override
-                    public void run() {
-                        super.run();
-                        try {
-                            Thread.sleep(Long.parseLong("100"));
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                        sendTrickleCandidate(candidate);
-                    }
-                };
-                thread.start();
+                sendTrickleCandidate(candidate);
             }
         }
 

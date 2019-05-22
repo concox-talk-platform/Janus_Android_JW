@@ -7,6 +7,7 @@ import android.os.Bundle;
 
 
 import com.example.janus_android_jw.bean.UserBean;
+import com.example.janus_android_jw.tool.AppTools;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -39,8 +40,7 @@ import janusclientapi.PluginHandleSendMessageCallbacks;
 public class JanusControl {
     public static final String REQUEST = "request";//信令，join,start,configure等
     public static final String MESSAGE = "message";//封装 json格式的message,通过ws发送的消息
-    public static String JANUS_URI = "ws://113.105.153.240:9188";//测试
-    //public static String JANUS_URI = "ws://ptt.jimilab.com:9188";//生产---23.98.41.159
+
     public static JanusPluginHandle handle = null;
     public static JanusServer janusServer;
     public static MyControlCallBack controlCallBack;
@@ -107,7 +107,7 @@ public class JanusControl {
 
         @Override
         public String getServerUri() {
-            return JANUS_URI;
+            return AppTools.JANUS_URI;
         }
 
 

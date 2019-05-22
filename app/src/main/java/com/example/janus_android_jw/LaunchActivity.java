@@ -37,21 +37,12 @@ import talk_cloud.TalkCloudModel;
 public class LaunchActivity extends AppCompatActivity implements TextToSpeech.OnInitListener {
 
     private TextToSpeech textToSpeech;
-    private TextView textView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.launch);
         textToSpeech = new TextToSpeech(LaunchActivity.this, this);
-
-        textView = (TextView)findViewById(R.id.text);
-        textView.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-
-            }
-        });
 
         if (AppTools.isNetworkConnected(LaunchActivity.this)) {
             GrpcConnectionManager.initGrpcConnectionManager();
@@ -92,7 +83,8 @@ public class LaunchActivity extends AppCompatActivity implements TextToSpeech.On
         }
         String name = tm.getDeviceId();
         Log.e("--imei-",name);
-        String password = "123456";
+        String password = name.substring(9,15);
+        Log.e("--imei-",password);
         TalkCloudApp.LoginReq loginReq = TalkCloudApp.LoginReq.newBuilder().setName(name).setPasswd(password).build();
         try {
             GrpcConnectionManager.getInstance().getGrpcInstantRequestHandler().submit(new Runnable() {
@@ -115,11 +107,13 @@ public class LaunchActivity extends AppCompatActivity implements TextToSpeech.On
     private void autoLogin(TalkCloudApp.LoginRsp loginRsp) {
         if(loginRsp == null){
             myToast(R.string.request_data_null,"");
+            Log.e("--janus--","---login---登录失败");
             return;
         }
 
         if(loginRsp.getRes().getCode() != 200){
             myToast(R.string.app_name,loginRsp.getRes().getMsg());
+            Log.e("--janus--","---login---"+loginRsp.getRes().getMsg());
             return;
         }
 
@@ -129,7 +123,11 @@ public class LaunchActivity extends AppCompatActivity implements TextToSpeech.On
         userBean.setUserId(loginRsp.getUserInfo().getId());
         userBean.setUserName(loginRsp.getUserInfo().getUserName());
         userBean.setNickName(loginRsp.getUserInfo().getNickName());
-        userBean.setDefaultGroupId((loginRsp.getUserInfo().getLockGroupId() == 0)?207:loginRsp.getUserInfo().getLockGroupId());
+        Log.e("--janus--","getUserInfo---"+loginRsp.getUserInfo().getId());
+        Log.e("--janus--","getUserName---"+loginRsp.getUserInfo().getUserName());
+        Log.e("--janus--","getNickName---"+loginRsp.getUserInfo().getNickName());
+        Log.e("--janus--","getLockGroupId---"+loginRsp.getUserInfo().getLockGroupId());
+
         ArrayList<GroupBean> groupBeanArrayList = new ArrayList<>();
         for (TalkCloudApp.GroupInfo groupRecord: loginRsp.getGroupListList()) {
             GroupBean groupBean = new GroupBean();
@@ -137,6 +135,11 @@ public class LaunchActivity extends AppCompatActivity implements TextToSpeech.On
             groupBean.setGroupId(groupRecord.getGid());
             groupBeanArrayList.add(groupBean);
         }
+        int myid = 0;
+        if(groupBeanArrayList.size()>0){
+            myid = groupBeanArrayList.get(0).getGroupId();
+        }
+        userBean.setDefaultGroupId((loginRsp.getUserInfo().getLockGroupId() == 0)?myid:loginRsp.getUserInfo().getLockGroupId());
         userBean.setGroupBeanArrayList(groupBeanArrayList);
         UserBean.setUserBean(userBean);
 

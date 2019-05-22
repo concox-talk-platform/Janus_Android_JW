@@ -121,8 +121,8 @@ public class JanusServer implements Runnable, IJanusMessageObserver, IJanusSessi
             } catch (InterruptedException ex) {
                 keep_alive = null;
             }
-            if (!connected || serverConnection.getMessengerType() != JanusMessengerType.websocket)
-                return;
+//            if (!connected || serverConnection.getMessengerType() != JanusMessengerType.websocket)
+//                return;
             JSONObject obj = new JSONObject();
             try {
                 obj.put("janus", JanusMessageType.keepalive.toString());
@@ -177,7 +177,6 @@ public class JanusServer implements Runnable, IJanusMessageObserver, IJanusSessi
     public void Destroy() {
         serverConnection.disconnect();
         keep_alive = null;
-        keep_alive.interrupt();
         connected = false;
         gatewayObserver.onDestroy();
         for (ConcurrentHashMap.Entry<BigInteger, JanusPluginHandle> handle : attachedPlugins.entrySet()) {
@@ -484,8 +483,10 @@ public class JanusServer implements Runnable, IJanusMessageObserver, IJanusSessi
     public void onSessionCreationSuccess(JSONObject obj) {
         try {
             sessionId = new BigInteger(obj.getJSONObject("data").getString("id"));
-            keep_alive = new Thread(this, "KeepAlive");
-            keep_alive.start();
+            if(!isReConnect){
+                keep_alive = new Thread(this, "KeepAlive");
+                keep_alive.start();
+            }
             connected = true;
             //TODO do we want to keep track of multiple sessions and servers?
             gatewayObserver.onSuccess();

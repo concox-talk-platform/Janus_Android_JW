@@ -11,14 +11,17 @@ public class AppTools {
     private static String appVersion = "1.0.1";
     private static int appVersionCode = 101;
 
-    //测试
-    public static String host = "113.105.153.240";
-    public static int port = 9001;
-
-    //生产
+    //生产--grpc
     //public static String host = "ptt.jimilab.com";
     //public static int port = 9001;
+    //生产--janus
+    //public static String JANUS_URI = "ws://ptt.jimilab.com:9188";
 
+    //测试--grpc-联通
+    public static String host = "114.119.113.97";
+    public static int port = 9001;
+    //测试--janus-联通
+    public static String JANUS_URI = "ws://114.119.113.97:9188";
 
     public static boolean isNetworkConnected(Context context) {
         if (context != null) {
