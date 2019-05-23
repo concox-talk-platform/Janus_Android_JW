@@ -709,6 +709,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                     break;
                 case 205:
                     //未获取到讲话权限-有人在讲话-指示灯为绿色开启
+                    JanusControl.setAddAudioTrack();
                     sendBroadcast(new Intent("com.dfl.greenled.on"));
                     break;
                 case 206:
@@ -717,6 +718,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                     break;
                 case 207:
                     //讲话结束-指示灯为绿色开启
+                    JanusControl.setRemoveAudioTrack();
                     sendBroadcast(new Intent("com.dfl.greenled.off"));
                     break;
                 case 208:
@@ -831,6 +833,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                                     }
                                 }
                                 if (value.getImMsgData().getMsgType() == 5) {//ptt 对讲消息
+                                    Log.e("---janus---", "----即时消息-Type---" + value.getImMsgData().getMsgType());
                                     for (int i = 0; i < UserBean.getUserBean().getGroupBeanArrayList().size(); i++) {
                                         if (UserBean.getUserBean().getGroupBeanArrayList().get(i).getGroupId() == value.getImMsgData().getReceiverId()) {
                                             MessageBean messageBean = new MessageBean();
